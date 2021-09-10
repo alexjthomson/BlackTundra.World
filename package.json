@@ -1,0 +1,23 @@
+{
+  "name": "com.blacktundra.world",
+  "version": "2.0.0",
+  "displayName": "World",
+  "description": "Tools used for creating an imersive 3D environment.",
+  "unity": "2020.1",
+  "type": "library",
+  "hideInEditor": false,
+  "keywords": [
+    "world",
+    "path",
+    "road",
+	"sky",
+	"environment",
+	"weather",
+	"time"
+  ],
+  "author": {
+    "name": "Black Tundra",
+    "email": "contact@blacktundra.com",
+    "url": "https://blacktundra.com"
+  }
+}
