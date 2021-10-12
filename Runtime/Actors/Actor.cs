@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 using BlackTundra.Foundation;
 using BlackTundra.Foundation.Collections.Generic;
@@ -10,6 +11,7 @@ using UnityEngine;
 using UnityEngine.AI;
 
 using Console = BlackTundra.Foundation.Console;
+using Object = UnityEngine.Object;
 
 namespace BlackTundra.World.Actors {
 
@@ -318,6 +320,11 @@ namespace BlackTundra.World.Actors {
                 }
             }
         }
+
+        /// <summary>
+        /// Returns <c>true</c> if the <see cref="Actor"/> is on a <see cref="NavMesh"/>.
+        /// </summary>
+        public bool IsDirectable => agent.isOnNavMesh;
 
         #endregion
 
@@ -935,6 +942,165 @@ namespace BlackTundra.World.Actors {
         public float Damage(in object sender, float damage, in object data = null) {
             if (behaviour == null) return 0.0f; // no damage was delt
             return behaviour.OnActorDamaged(sender, damage, data);
+        }
+
+        #endregion
+
+        #region ActorCommand
+
+        [Command(
+            name: "actor",
+            description: "Displays actor information.",
+            usage: ""
+        )]
+        private static bool ActorCommand(CommandInfo info) {
+            ConsoleWindow console = Core.ConsoleWindow;
+            int argumentCount = info.args.Count;
+            if (argumentCount > 0) {
+                string arg0 = info.args[0].ToLower();
+                switch (arg0) {
+                    case "list": {
+                        if (argumentCount == 1) {
+                            int actorCount = ActorBuffer.Count;
+                            string[,] table = new string[actorCount + 1, 7];
+                            table[0, 0] = "Index";
+                            table[0, 1] = "Instance ID";
+                            table[0, 2] = "Name";
+                            table[0, 3] = "Behaviour Type";
+                            table[0, 4] = "Target Object";
+                            table[0, 5] = "Target Position";
+                            table[0, 6] = "Enabled";
+                            Actor actor;
+                            for (int i = actorCount; i > 0; i--) {
+                                actor = ActorBuffer[i - 1];
+                                table[i, 0] = i.ToString();
+                                table[i, 1] = actor.GetInstanceID().ToHex();
+                                table[i, 2] = actor.name;
+                                table[i, 3] = actor.behaviour?.GetType().Name ?? "None";
+                                table[i, 4] = actor.targetCollider?.name ?? "None";
+                                table[i, 5] = actor.targetPosition.ToString();
+                                table[i, 6] = actor.enabled ? "true" : "false";
+                            }
+                            console.PrintTable(table, true, true);
+                            return true;
+                        } else {
+                            console.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
+                            return false;
+                        }
+                    }
+                    case "destroy": {
+                        if (argumentCount == 2) {
+                            string args1 = info.args[1];
+                            if (int.TryParse(args1, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int instanceId)) {
+                                Actor actor;
+                                for (int i = ActorBuffer.Count - 1; i >= 0; i--) {
+                                    actor = ActorBuffer[i];
+                                    if (instanceId == actor.GetInstanceID()) {
+                                        console.Print($"Destroying actor \"{instanceId.ToHex()}\".");
+                                        Destroy(actor.gameObject);
+                                        return true;
+                                    }
+                                }
+                                console.Print($"No actor \"{instanceId.ToHex()}\" exists.");
+                                return false;
+                            } else {
+                                console.Print($"Failed to parse \"{instanceId.ToHex()}\" to actor instance ID.");
+                                return false;
+                            }
+                        } else {
+                            console.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
+                            return false;
+                        }
+                    }
+                    case "enable": {
+                        if (argumentCount == 2) {
+                            string args1 = info.args[1];
+                            if (int.TryParse(args1, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int instanceId)) {
+                                Actor actor;
+                                for (int i = ActorBuffer.Count - 1; i >= 0; i--) {
+                                    actor = ActorBuffer[i];
+                                    if (instanceId == actor.GetInstanceID()) {
+                                        if (actor.enabled) {
+                                            console.Print($"Actor \"{instanceId.ToHex()}\" is already enabled.");
+                                        } else {
+                                            console.Print($"Enabling actor \"{instanceId.ToHex()}\".");
+                                            actor.enabled = true;
+                                        }
+                                        return true;
+                                    }
+                                }
+                                console.Print($"No actor \"{instanceId.ToHex()}\" exists.");
+                                return false;
+                            } else {
+                                console.Print($"Failed to parse \"{instanceId.ToHex()}\" to actor instance ID.");
+                                return false;
+                            }
+                        } else {
+                            console.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
+                            return false;
+                        }
+                    }
+                    case "disable": {
+                        if (argumentCount == 2) {
+                            string args1 = info.args[1];
+                            if (int.TryParse(args1, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int instanceId)) {
+                                Actor actor;
+                                for (int i = ActorBuffer.Count - 1; i >= 0; i--) {
+                                    actor = ActorBuffer[i];
+                                    if (instanceId == actor.GetInstanceID()) {
+                                        if (!actor.enabled) {
+                                            console.Print($"Actor \"{instanceId.ToHex()}\" is already disabled.");
+                                        } else {
+                                            console.Print($"Disabling actor \"{instanceId.ToHex()}\".");
+                                            actor.enabled = false;
+                                        }
+                                        return true;
+                                    }
+                                }
+                                console.Print($"No actor \"{instanceId.ToHex()}\" exists.");
+                                return false;
+                            } else {
+                                console.Print($"Failed to parse \"{instanceId.ToHex()}\" to actor instance ID.");
+                                return false;
+                            }
+                        } else {
+                            console.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
+                            return false;
+                        }
+                    }
+                    case "clone": {
+                        if (argumentCount == 2) {
+                            string args1 = info.args[1];
+                            if (int.TryParse(args1, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int instanceId)) {
+                                Actor actor;
+                                for (int i = ActorBuffer.Count - 1; i >= 0; i--) {
+                                    actor = ActorBuffer[i];
+                                    if (instanceId == actor.GetInstanceID()) {
+                                        console.Print($"Cloning actor \"{instanceId.ToHex()}\".");
+                                        Instantiate(actor, actor.transform.position, actor.transform.rotation, actor.transform.parent);
+                                        return true;
+                                    }
+                                }
+                                console.Print($"No actor \"{instanceId.ToHex()}\" exists.");
+                                return false;
+                            } else {
+                                console.Print($"Failed to parse \"{instanceId.ToHex()}\" to actor instance ID.");
+                                return false;
+                            }
+                        } else {
+                            console.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
+                            return false;
+                        }
+                    }
+                    default: {
+                        console.Print(ConsoleUtility.UnknownArgumentMessage(arg0, 0));
+                        return false;
+                    }
+                }
+            } else {
+                console.Print("Expected at least one argument.");
+                return false;
+            }
         }
 
         #endregion

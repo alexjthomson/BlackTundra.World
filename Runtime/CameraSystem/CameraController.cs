@@ -18,6 +18,7 @@ namespace BlackTundra.World.CameraSystem {
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Camera))]
     [RequireComponent(typeof(AudioSource))]
+    [DefaultExecutionOrder(-100)]
     public sealed class CameraController : MonoBehaviour {
 
         #region constant

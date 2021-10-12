@@ -13,6 +13,8 @@ namespace BlackTundra.World.Actors {
         /// </summary>
         Vector3 TargetPosition { get; set; }
 
+        bool IsDirectable { get; }
+
     }
 
 }
