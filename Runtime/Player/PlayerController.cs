@@ -44,6 +44,11 @@ namespace BlackTundra.World.Player {
         /// <inheritdoc cref="IsGrounded"/>
         private bool grounded = false;
 
+        /// <summary>
+        /// When <c>true</c>, the yaw rotation is taken into account when applying movement velocity.
+        /// </summary>
+        public bool applyRotation = true;
+
         #region _mass
 
         /// <inheritdoc cref="mass"/>
@@ -343,7 +348,7 @@ namespace BlackTundra.World.Player {
             }
             #endregion
 
-            Vector3 totalVelocity = transform.rotation * motiveVelocity; // total velocity calculated this update
+            Vector3 totalVelocity = applyRotation ? transform.rotation * motiveVelocity : motiveVelocity; // total velocity calculated this update
             if (grounded) {
                 totalVelocity += groundedVelocity; // if grounded, apply the grounded velocity to the total velocity
                 float groundFriction = frictionCoefficient * -gravity * deltaTime;

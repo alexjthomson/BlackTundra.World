@@ -7,6 +7,8 @@ namespace BlackTundra.World.Items {
     /// <summary>
     /// Controls and manages an instance of an <see cref="Item"/> that exists in the world.
     /// </summary>
+    [DisallowMultipleComponent]
+    [RequireComponent(typeof(Rigidbody))]
     public sealed class WorldItem : MonoBehaviour, IInteractable {
 
         #region variable

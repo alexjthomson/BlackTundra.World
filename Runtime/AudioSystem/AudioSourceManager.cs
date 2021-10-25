@@ -56,7 +56,7 @@ namespace BlackTundra.World.Audio {
 
         #region Initialise
 
-        [CoreInitialise]
+        [CoreInitialise(int.MinValue)]
         private static void Initialise() {
             // load audio mixer:
             audioMixer = Resources.Load<AudioMixer>(MixerResourcePath);

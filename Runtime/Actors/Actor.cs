@@ -954,7 +954,6 @@ namespace BlackTundra.World.Actors {
             usage: ""
         )]
         private static bool ActorCommand(CommandInfo info) {
-            ConsoleWindow console = Core.ConsoleWindow;
             int argumentCount = info.args.Count;
             if (argumentCount > 0) {
                 string arg0 = info.args[0].ToLower();
@@ -981,10 +980,10 @@ namespace BlackTundra.World.Actors {
                                 table[i, 5] = actor.targetPosition.ToString();
                                 table[i, 6] = actor.enabled ? "true" : "false";
                             }
-                            console.PrintTable(table, true, true);
+                            info.context.PrintTable(table, true, true);
                             return true;
                         } else {
-                            console.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
+                            info.context.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
                             return false;
                         }
                     }
@@ -996,19 +995,19 @@ namespace BlackTundra.World.Actors {
                                 for (int i = ActorBuffer.Count - 1; i >= 0; i--) {
                                     actor = ActorBuffer[i];
                                     if (instanceId == actor.GetInstanceID()) {
-                                        console.Print($"Destroying actor \"{instanceId.ToHex()}\".");
+                                        info.context.Print($"Destroying actor \"{instanceId.ToHex()}\".");
                                         Destroy(actor.gameObject);
                                         return true;
                                     }
                                 }
-                                console.Print($"No actor \"{instanceId.ToHex()}\" exists.");
+                                info.context.Print($"No actor \"{instanceId.ToHex()}\" exists.");
                                 return false;
                             } else {
-                                console.Print($"Failed to parse \"{instanceId.ToHex()}\" to actor instance ID.");
+                                info.context.Print($"Failed to parse \"{instanceId.ToHex()}\" to actor instance ID.");
                                 return false;
                             }
                         } else {
-                            console.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
+                            info.context.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
                             return false;
                         }
                     }
@@ -1021,22 +1020,22 @@ namespace BlackTundra.World.Actors {
                                     actor = ActorBuffer[i];
                                     if (instanceId == actor.GetInstanceID()) {
                                         if (actor.enabled) {
-                                            console.Print($"Actor \"{instanceId.ToHex()}\" is already enabled.");
+                                            info.context.Print($"Actor \"{instanceId.ToHex()}\" is already enabled.");
                                         } else {
-                                            console.Print($"Enabling actor \"{instanceId.ToHex()}\".");
+                                            info.context.Print($"Enabling actor \"{instanceId.ToHex()}\".");
                                             actor.enabled = true;
                                         }
                                         return true;
                                     }
                                 }
-                                console.Print($"No actor \"{instanceId.ToHex()}\" exists.");
+                                info.context.Print($"No actor \"{instanceId.ToHex()}\" exists.");
                                 return false;
                             } else {
-                                console.Print($"Failed to parse \"{instanceId.ToHex()}\" to actor instance ID.");
+                                info.context.Print($"Failed to parse \"{instanceId.ToHex()}\" to actor instance ID.");
                                 return false;
                             }
                         } else {
-                            console.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
+                            info.context.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
                             return false;
                         }
                     }
@@ -1049,22 +1048,22 @@ namespace BlackTundra.World.Actors {
                                     actor = ActorBuffer[i];
                                     if (instanceId == actor.GetInstanceID()) {
                                         if (!actor.enabled) {
-                                            console.Print($"Actor \"{instanceId.ToHex()}\" is already disabled.");
+                                            info.context.Print($"Actor \"{instanceId.ToHex()}\" is already disabled.");
                                         } else {
-                                            console.Print($"Disabling actor \"{instanceId.ToHex()}\".");
+                                            info.context.Print($"Disabling actor \"{instanceId.ToHex()}\".");
                                             actor.enabled = false;
                                         }
                                         return true;
                                     }
                                 }
-                                console.Print($"No actor \"{instanceId.ToHex()}\" exists.");
+                                info.context.Print($"No actor \"{instanceId.ToHex()}\" exists.");
                                 return false;
                             } else {
-                                console.Print($"Failed to parse \"{instanceId.ToHex()}\" to actor instance ID.");
+                                info.context.Print($"Failed to parse \"{instanceId.ToHex()}\" to actor instance ID.");
                                 return false;
                             }
                         } else {
-                            console.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
+                            info.context.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
                             return false;
                         }
                     }
@@ -1076,29 +1075,29 @@ namespace BlackTundra.World.Actors {
                                 for (int i = ActorBuffer.Count - 1; i >= 0; i--) {
                                     actor = ActorBuffer[i];
                                     if (instanceId == actor.GetInstanceID()) {
-                                        console.Print($"Cloning actor \"{instanceId.ToHex()}\".");
+                                        info.context.Print($"Cloning actor \"{instanceId.ToHex()}\".");
                                         Instantiate(actor, actor.transform.position, actor.transform.rotation, actor.transform.parent);
                                         return true;
                                     }
                                 }
-                                console.Print($"No actor \"{instanceId.ToHex()}\" exists.");
+                                info.context.Print($"No actor \"{instanceId.ToHex()}\" exists.");
                                 return false;
                             } else {
-                                console.Print($"Failed to parse \"{instanceId.ToHex()}\" to actor instance ID.");
+                                info.context.Print($"Failed to parse \"{instanceId.ToHex()}\" to actor instance ID.");
                                 return false;
                             }
                         } else {
-                            console.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
+                            info.context.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
                             return false;
                         }
                     }
                     default: {
-                        console.Print(ConsoleUtility.UnknownArgumentMessage(arg0, 0));
+                        info.context.Print(ConsoleUtility.UnknownArgumentMessage(arg0, 0));
                         return false;
                     }
                 }
             } else {
-                console.Print("Expected at least one argument.");
+                info.context.Print("Expected at least one argument.");
                 return false;
             }
         }

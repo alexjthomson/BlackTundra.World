@@ -1,3 +1,5 @@
+//#define WORLD_HIDE_PLAYER_CONTROLLER_COMPONENTS
+
 using BlackTundra.Foundation.Editor.Utility;
 using BlackTundra.World.Player;
 
@@ -32,13 +34,17 @@ namespace BlackTundra.World.Editor.Player {
                 dirty = true;
                 collider = controller.gameObject.AddComponent<CapsuleCollider>();
             }
+#if WORLD_HIDE_PLAYER_CONTROLLER_COMPONENTS
             collider.hideFlags = HideFlags.HideInInspector;
+#endif
             character = controller.GetComponent<CharacterController>();
             if (character == null) {
                 dirty = true;
                 character = controller.gameObject.AddComponent<CharacterController>();
             }
+#if WORLD_HIDE_PLAYER_CONTROLLER_COMPONENTS
             character.hideFlags = HideFlags.HideInInspector;
+#endif
             float height = collider.height;
             float radius = collider.radius;
             float skinWidth = character.skinWidth;
@@ -57,11 +63,13 @@ namespace BlackTundra.World.Editor.Player {
         protected override void DrawInspector() {
 
             float nf;
+            bool nb;
 
             float mass = controller._mass;
             float groundedVelocity = -controller.groundedVelocity.y;
             float gravity = controller._gravity;
             float drag = controller._drag;
+            bool applyRotation = controller.applyRotation;
 
             nf = Mathf.Max(EditorLayout.FloatField("Mass", mass), 0.1f);
             if (nf != mass) {
@@ -88,6 +96,13 @@ namespace BlackTundra.World.Editor.Player {
             if (nf != groundedVelocity) {
                 groundedVelocity = nf;
                 controller.groundedVelocity = new Vector3(0.0f, -groundedVelocity, 0.0f);
+                MarkAsDirty(controller);
+            }
+
+            nb = EditorLayout.BooleanField("Apply Yaw Rotation", applyRotation);
+            if (nb != applyRotation) {
+                applyRotation = nb;
+                controller.applyRotation = applyRotation;
                 MarkAsDirty(controller);
             }
 
@@ -125,6 +140,16 @@ namespace BlackTundra.World.Editor.Player {
                 //character.center = new Vector3(0.0f, height * 0.5f, 0.0f);
                 character.radius = radius - skinWidth;
                 MarkAllAsDirty();
+            }
+
+            EditorLayout.Space();
+
+            LayerMask layermask = controller._layerMask;
+            LayerMask nlm = EditorLayout.LayerMaskField("Layer Mask", layermask);
+            if (nlm != layermask) {
+                layermask = nlm;
+                controller._layerMask = layermask;
+                MarkAsDirty(controller);
             }
 
             EditorLayout.Space();
