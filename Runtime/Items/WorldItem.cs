@@ -46,6 +46,22 @@ namespace BlackTundra.World.Items {
 
         #endregion
 
+        #region XRInteractStart
+
+        public void XRInteractStart() {
+
+        }
+
+        #endregion
+
+        #region XRInteractEnd
+
+        public void XRInteractEnd() {
+
+        }
+
+        #endregion
+
         #endregion
 
     }

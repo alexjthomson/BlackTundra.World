@@ -23,6 +23,20 @@
         /// <remarks>Don't call this method directly to cause interactions.</remarks>
         bool InteractStop(in object sender, in object[] parameters);
 
+#if ENABLE_VR
+
+        /// <summary>
+        /// Method that can be invoked via XR when the <see cref="IInteractable"/> is selected.
+        /// </summary>
+        void XRInteractStart();
+
+        /// <summary>
+        /// Method that can be invoked via XR when the <see cref="IInteractable"/> selection is exited or finished.
+        /// </summary>
+        void XRInteractEnd();
+
+#endif
+
     }
 
 }
