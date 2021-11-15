@@ -55,6 +55,21 @@ namespace BlackTundra.World {
         private string[] _tags = new string[0];
 
         /// <summary>
+        /// Layer converted into a layer flag.
+        /// </summary>
+        private int layerFlag;
+
+        /// <summary>
+        /// <see cref="_blendDistance"/> squared.
+        /// </summary>
+        private float sqrBlendDistance;
+
+        /// <summary>
+        /// <code>1.0f / <see cref="sqrBlendDistance"/></code>.
+        /// </summary>
+        private float inverseSqrBlendDistance;
+
+        /// <summary>
         /// Hash codes generate from the <see cref="_tags"/> array.
         /// </summary>
         private int[] tagHashCodes = null;
@@ -85,7 +100,11 @@ namespace BlackTundra.World {
         /// </summary>
         public float blendDistance {
             get => _blendDistance;
-            set => _blendDistance = value > 0.0f ? value : 0.0f;
+            set {
+                _blendDistance = value > 0.0f ? value : 0.0f;
+                sqrBlendDistance = _blendDistance * _blendDistance;
+                inverseSqrBlendDistance = 1.0f / sqrBlendDistance;
+            }
         }
 
         /// <summary>
@@ -127,6 +146,9 @@ namespace BlackTundra.World {
         #region OnEnable
 
         private void OnEnable() {
+            layerFlag = 1 << gameObject.layer;
+            sqrBlendDistance = _blendDistance * _blendDistance;
+            inverseSqrBlendDistance = 1.0f / sqrBlendDistance;
             VolumeList.Add(this); // add to the list of all volumes
         }
 
@@ -294,74 +316,53 @@ namespace BlackTundra.World {
 
         #region QueryPoint
 
-        /// <summary>
-        /// Queries the <see cref="Volume"/> instances that have influence on the provided <paramref name="point"/>.
-        /// </summary>
-        /// <param name="point">Point in world-space to query.</param>
-        /// <param name="layerMask"><see cref="LayerMask"/> to use to find <see cref="Volume"/> instances.</param>
-        /// <param name="tags">Tags to get. Leave empty to get any tag.</param>
-        /// <returns>Returns every <see cref="VolumeHit"/> that occurs during the query.</returns>
-        public static IEnumerator<VolumeHit> QueryPoint(Vector3 point, LayerMask layerMask, params string[] tags) {
-            if (tags == null) throw new ArgumentNullException(nameof(tags));
+        public static IEnumerator<VolumeHit> QueryPoint(Vector3 point, LayerMask layerMask, int tag) {
             Volume volume; // used to store a reference to the current volume
             for (int i = VolumeList.Count - 1; i >= 0; i--) { // iterate each volume
                 volume = VolumeList[i]; // get the current volume
-                if (volume == null) { // null reference (shoud not happen)
-                    VolumeList.RemoveAt(i); // remove from list
-                    continue; // continue
-                }
-                if (!volume.enabled || ((1 << volume.gameObject.layer) & layerMask) == 0) continue; // volume is not enabled
+                if ((volume.layerFlag & layerMask) == 0 || !volume.HasTag(tag)) continue; // volume not in layermask or doesn't have any of the tags
                 Vector3 closestPoint = volume.collider.ClosestPoint(point); // get the closest point on the collider to the point
                 float sqrDistance = (closestPoint - point).sqrMagnitude; // calculate the square distance from the point to the closest point
-                float sqrBlendDistance = volume._blendDistance * volume._blendDistance;
 
                 /* Note:
                  * Volume doesn't do anything when `sqrDistance = sqrBlendDistance`, but we can't
                  * use a >= comparison as sqrBlendDistance could be set to 0, in which case, the
                  * volume would always have total influence.
                  */
-                if (sqrDistance > sqrBlendDistance) continue; // volume has no influence
-
-                if (tags.Length > 0 && !volume.HasTag(tags, true)) continue; // volume doesn't have any of the required tags
+                if (sqrDistance > volume.sqrBlendDistance) continue; // volume has no influence
 
                 // calculate the influence that the volume will have:
-                float influence = sqrBlendDistance > 0.0f
-                    ? 1.0f - (sqrDistance / sqrBlendDistance)
-                    : 1.0f;
+                float influence = volume.sqrBlendDistance > 0.0f
+                    ? volume._weight * (1.0f - (sqrDistance * volume.inverseSqrBlendDistance))
+                    : volume._weight;
 
-                yield return new VolumeHit(volume, point, influence * volume._weight); // return that this volume was hit
+                yield return new VolumeHit(volume, point, influence); // return that this volume was hit
             }
         }
 
-        public static IEnumerator<VolumeHit> QueryPoint(Vector3 point, LayerMask layerMask, params int[] hashes) {
-            if (hashes == null) throw new ArgumentNullException(nameof(hashes));
+        public static IEnumerator<VolumeHit> QueryPoint(Vector3 point, LayerMask layerMask, params int[] tags) {
+            if (tags == null) throw new ArgumentNullException(nameof(tags));
+            if (tags.Length == 0) throw new ArgumentException(nameof(tags));
             Volume volume; // used to store a reference to the current volume
             for (int i = VolumeList.Count - 1; i >= 0; i--) { // iterate each volume
                 volume = VolumeList[i]; // get the current volume
-                if (volume == null) { // null reference (shoud not happen)
-                    VolumeList.RemoveAt(i); // remove from list
-                    continue; // continue
-                }
-                if (!volume.enabled || ((1 << volume.gameObject.layer) & layerMask) == 0) continue; // volume is not enabled
+                if ((volume.layerFlag & layerMask) == 0 || !volume.HasTag(tags, true)) continue; // volume not in layermask or doesn't have any of the tags
                 Vector3 closestPoint = volume.collider.ClosestPoint(point); // get the closest point on the collider to the point
                 float sqrDistance = (closestPoint - point).sqrMagnitude; // calculate the square distance from the point to the closest point
-                float sqrBlendDistance = volume._blendDistance * volume._blendDistance;
 
                 /* Note:
                  * Volume doesn't do anything when `sqrDistance = sqrBlendDistance`, but we can't
                  * use a >= comparison as sqrBlendDistance could be set to 0, in which case, the
                  * volume would always have total influence.
                  */
-                if (sqrDistance > sqrBlendDistance) continue; // volume has no influence
-
-                if (hashes.Length > 0 && !volume.HasTag(hashes, true)) continue; // volume doesn't have any of the required tags
+                if (sqrDistance > volume.sqrBlendDistance) continue; // volume has no influence
 
                 // calculate the influence that the volume will have:
-                float influence = sqrBlendDistance > 0.0f
-                    ? 1.0f - (sqrDistance / sqrBlendDistance)
-                    : 1.0f;
+                float influence = volume.sqrBlendDistance > 0.0f
+                    ? volume._weight * (1.0f - (sqrDistance * volume.inverseSqrBlendDistance))
+                    : volume._weight;
 
-                yield return new VolumeHit(volume, point, influence * volume._weight); // return that this volume was hit
+                yield return new VolumeHit(volume, point, influence); // return that this volume was hit
             }
         }
 
@@ -375,32 +376,26 @@ namespace BlackTundra.World {
         /// <returns>
         /// Returns a value between <c>0.0</c> and <c>1.0</c> that indicates the influence of a tag at a <paramref name="point"/>.
         /// </returns>
-        public static float QueryTagAtPoint(in string tag, in Vector3 point, in LayerMask layermask) => QueryTagAtPoint(tag.GetHashCode(), point, layermask);
-        public static float QueryTagAtPoint(in int hash, in Vector3 point, in LayerMask layermask) {
+        public static float QueryTagAtPoint(in int tag, in Vector3 point, in LayerMask layermask) {
             Volume volume; // used to store a reference to the current volume
             float totalInfluence = 0.0f;
             for (int i = VolumeList.Count - 1; i >= 0; i--) { // iterate each volume
                 volume = VolumeList[i]; // get the current volume
-                if (volume == null) { // null reference (shoud not happen)
-                    VolumeList.RemoveAt(i); // remove from list
-                    continue; // continue
-                }
-                if (!volume.enabled || ((1 << volume.gameObject.layer) & layermask) == 0 || !volume.HasTag(hash)) continue; // volume is not enabled
+                if ((volume.layerFlag & layermask) == 0 || !volume.HasTag(tag)) continue; // volume is not in layermask or doesn't have the tag
                 Vector3 closestPoint = volume.collider.ClosestPoint(point); // get the closest point on the collider to the point
                 float sqrDistance = (closestPoint - point).sqrMagnitude; // calculate the square distance from the point to the closest point
-                float sqrBlendDistance = volume._blendDistance * volume._blendDistance;
 
                 /* Note:
                  * Volume doesn't do anything when `sqrDistance = sqrBlendDistance`, but we can't
                  * use a >= comparison as sqrBlendDistance could be set to 0, in which case, the
                  * volume would always have total influence.
                  */
-                if (sqrDistance > sqrBlendDistance) continue; // volume has no influence
+                if (sqrDistance > volume.sqrBlendDistance) continue; // volume has no influence
 
                 // calculate the influence that the volume will have:
-                float influence = sqrBlendDistance > 0.0f
-                    ? 1.0f - (sqrDistance / sqrBlendDistance)
-                    : 1.0f;
+                float influence = volume.sqrBlendDistance > 0.0f
+                    ? volume._weight * (1.0f - (sqrDistance * volume.inverseSqrBlendDistance))
+                    : volume._weight;
 
                 if (influence > totalInfluence) totalInfluence = influence;
             }

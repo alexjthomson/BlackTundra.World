@@ -283,7 +283,7 @@ namespace BlackTundra.World.Actors {
         /// <see cref="TargetPosition"/> is less than or equal to the <c>stoppingDistance</c> on the <see cref="NavMeshAgent"/>
         /// component.
         /// </summary>
-        public bool HasReachedTargetPosition => (targetPosition - transform.position).sqrMagnitude <= agent.stoppingDistance * agent.stoppingDistance;
+        public bool HasReachedTargetPosition => !agent.hasPath || agent.remainingDistance <= agent.stoppingDistance;
 
         /// <summary>
         /// Suspected position of the target that the <see cref="Actor"/> is tracking.
@@ -501,7 +501,7 @@ namespace BlackTundra.World.Actors {
         /// </summary>
         private void UpdateTarget() {
             if (targetCollider != null) { // the actor has a collider to track
-                updateTarget = false;
+                //updateTarget = false;
                 Vector3 currentTargetPosition = targetCollider.transform.position;
                 if (!currentTargetPosition.IsInsideCube(targetPosition, agent.stoppingDistance) // the current position of the target collider is significantly far from the current targetPosition
                     && SetDestination(currentTargetPosition) // try set the destination for the actor to the new position of the target
@@ -510,9 +510,10 @@ namespace BlackTundra.World.Actors {
                     targetPosition = currentTargetPosition; // update the target position to the current position
                     if (behaviour != null) behaviour.OnActorTargetUpdated(targetCollider, targetPosition); // update the actor behaviour
                 }
-            } else if (updateTarget && SetDestination(targetPosition)) { // there is no collider to track, just update the destination
+            } else if (updateTarget) { // no collider to track, just track destination
                 updateTarget = false;
-                if (behaviour != null) behaviour.OnActorTargetUpdated(null, targetPosition); // update the actor behaviour
+                if (SetDestination(targetPosition) && behaviour != null)
+                    behaviour.OnActorTargetUpdated(null, targetPosition); // update the actor behaviour
             }
         }
 
@@ -606,6 +607,7 @@ namespace BlackTundra.World.Actors {
         public bool IsWithinRangeOfTarget(in float range) {
             if (range < 0.0f) throw new ArgumentOutOfRangeException(nameof(range));
             Vector3 actorPosition = transform.position;
+            Vector3 targetPosition = targetCollider != null ? targetCollider.transform.position : this.targetPosition;
             float x = targetPosition.x - actorPosition.x;
             float z = targetPosition.z - actorPosition.z;
             float sqrXZDistance = (x * x) + (z * z);
@@ -621,8 +623,8 @@ namespace BlackTundra.World.Actors {
                 float distance = 0.0f;
                 for (int i = points.Length - 1; i >= 1;) {
                     distance += (points[i] - points[--i]).magnitude;
+                    if (distance > range) return false; // path length greater than range range
                 }
-                if (distance > range) return false; // path length greater than range range
             }
             return true; // all checks passed
         }
@@ -663,12 +665,12 @@ namespace BlackTundra.World.Actors {
 
         #endregion
 
-        #region QueryVisualPerception
+        #region QueryVisionSensor
 
         /// <summary>
         /// An expensive operation to query what colliders the <see cref="Actor"/> can see.
         /// </summary>
-        public IEnumerator<Collider> QueryVisualPerception() {
+        public IEnumerator<Collider> QueryVisionSensor() {
             IVisionSensor sensor = profile.visionSensor;
             if (sensor == null) return null;
             return sensor.QueryVisualSensorFrom(
@@ -679,7 +681,7 @@ namespace BlackTundra.World.Actors {
 
         #endregion
 
-        #region QueryVisualPerceptionFrom
+        #region QueryVisionSensorFrom
 
         /// <summary>
         /// An expensive operation to query what colliders the <see cref="Actor"/> can see from <paramref name="point"/>.
@@ -689,7 +691,7 @@ namespace BlackTundra.World.Actors {
         /// <param name="point">Point in world-space to start the query from.</param>
         /// <param name="direction">Direction to look in.</param>
         /// <returns>Every <see cref="Collider"/> that the <see cref="Actor"/> can see.</returns>
-        public IEnumerator<Collider> QueryVisualPerceptionFrom(Vector3 point, Vector3 direction) {
+        public IEnumerator<Collider> QueryVisionSensorFrom(Vector3 point, Vector3 direction) {
             IVisionSensor sensor = profile.visionSensor;
             if (sensor == null) return null;
             return sensor.QueryVisualSensorFrom(point, direction);
@@ -697,9 +699,9 @@ namespace BlackTundra.World.Actors {
 
         #endregion
 
-        #region QueryAuditoryPerception
+        #region QuerySoundSensor
 
-        public IEnumerator<SoundSample> QueryAuditoryPerception() {
+        public IEnumerator<SoundSample> QuerySoundSensor() {
             ISoundSensor sensor = profile.soundSensor;
             if (sensor == null) return null;
             return profile.soundSensor.QuerySoundSensorFrom(
@@ -710,9 +712,9 @@ namespace BlackTundra.World.Actors {
 
         #endregion
 
-        #region QueryAuditoryPerceptionFrom
+        #region QuerySoundSensorFrom
 
-        public IEnumerator<SoundSample> QueryAuditoryPerceptionFrom(in Vector3 point, in Vector3 direction) {
+        public IEnumerator<SoundSample> QuerySoundSensorFrom(in Vector3 point, in Vector3 direction) {
             ISoundSensor sensor = profile.soundSensor;
             if (sensor == null) return null;
             return profile.soundSensor.QuerySoundSensorFrom(point, direction);

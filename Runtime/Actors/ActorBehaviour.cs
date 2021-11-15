@@ -224,13 +224,13 @@ namespace BlackTundra.World.Actors {
         #endregion
         */
 
-        #region QueryVisualPerception
+        #region QueryVisionSensor
 
         /// <summary>
         /// Queries the visual perception of the <see cref="actor"/>. This invokes <see cref="OnEvaluateObject(in Collider)"/> when an object is spotted.
         /// </summary>
-        protected void QueryVisualPerception() {
-            using (IEnumerator<Collider> visibleColliders = actor.QueryVisualPerception()) {
+        protected void QueryVisionSensor() {
+            using (IEnumerator<Collider> visibleColliders = actor.QueryVisionSensor()) {
                 while (visibleColliders.MoveNext()) {
                     OnColliderVisible(visibleColliders.Current);
                 }
@@ -239,10 +239,10 @@ namespace BlackTundra.World.Actors {
 
         #endregion
 
-        #region QueryAuditoryPerception
+        #region QuerySoundSensor
 
-        protected void QueryAuditoryPerception() {
-            using (IEnumerator<SoundSample> soundSamples = actor.QueryAuditoryPerception()) {
+        protected void QuerySoundSensor() {
+            using (IEnumerator<SoundSample> soundSamples = actor.QuerySoundSensor()) {
                 while (soundSamples.MoveNext()) {
                     OnSoundHeard(soundSamples.Current);
                 }
