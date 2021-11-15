@@ -50,6 +50,12 @@ namespace BlackTundra.World.Actors {
         [SerializeField]
         public LayerMask layerMask = -1;
 
+        /// <summary>
+        /// <see cref="LayerMask"/> containing layers that the sensor is interested in.
+        /// </summary>
+        [SerializeField]
+        public LayerMask interestMask = -1;
+
         #endregion
 
         #region logic
@@ -58,7 +64,7 @@ namespace BlackTundra.World.Actors {
 
         public bool IsDetectable(in Collider collider) {
             if (collider == null) throw new ArgumentNullException(nameof(collider));
-            return (collider.gameObject.layer & layerMask) != 0;
+            return ((1 << collider.gameObject.layer) & interestMask) != 0;
         }
 
         #endregion
@@ -74,7 +80,7 @@ namespace BlackTundra.World.Actors {
         /// <param name="direction">Direction to look in.</param>
         /// <returns>Every <see cref="Collider"/> that the <see cref="SectorVisionSensor"/> can see.</returns>
         public IEnumerator<Collider> QueryVisualSensorFrom(Vector3 point, Vector3 direction) {
-            Collider[] colliders = Physics.OverlapSphere(point, range, layerMask); // get all colliders in range of the actors visison
+            Collider[] colliders = Physics.OverlapSphere(point, range, interestMask); // get all colliders in range of the actors visison
             int colliderCount = colliders.Length;
             if (colliderCount == 0) yield break;
             Collider collider;
@@ -96,7 +102,7 @@ namespace BlackTundra.World.Actors {
         /// </returns>
         public bool IsVisibleFrom(in Vector3 point, Vector3 direction, in Collider collider) {
             if (collider == null) throw new ArgumentNullException(nameof(collider));
-            if ((collider.gameObject.layer & layerMask) == 0) return false; // not in visible layer mask
+            if (((1 << collider.gameObject.layer) & interestMask) == 0) return false; // not in visible layer mask
             
             Bounds colliderBounds = collider.bounds;
             Vector3 colliderWorldPosition = colliderBounds.center;
@@ -346,7 +352,7 @@ namespace BlackTundra.World.Actors {
 #if SENSOR_DEBUG
             Debug.DrawLine(origin, origin + direction, Color.cyan); // draw the line of sight
 #endif
-            return Physics.Raycast(origin, direction, out RaycastHit hit, range, layerMask) && hit.collider.transform == transform;
+            return Physics.Raycast(origin, direction, out RaycastHit hit, range, layerMask, QueryTriggerInteraction.Ignore) && hit.collider.transform == transform;
 
         }
 
