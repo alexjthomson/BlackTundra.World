@@ -10,7 +10,7 @@ namespace BlackTundra.World.Items {
     /// Describes an <see cref="ItemData"/> entry.
     /// </summary>
 #if UNITY_EDITOR
-    [CreateAssetMenu(menuName = "Items/Item Descriptor")]
+    [CreateAssetMenu(menuName = "Configuration/Item/Descriptor", fileName = "ItemDescriptor")]
 #endif
     public sealed class ItemDescriptor : ScriptableObject {
 

@@ -7,10 +7,10 @@ namespace BlackTundra.World.Interaction.Interactors {
     /// Manages a raycast based interaction system.
     /// </summary>
 #if UNITY_EDITOR
-    [AddComponentMenu("Interaction/RayInteractor")]
+    [AddComponentMenu("Interaction/Drag Interactor")]
 #endif
     [DisallowMultipleComponent]
-    public sealed class RayInteractor : MonoBehaviour {
+    public sealed class ActionBasedDragInteractor : MonoBehaviour {
 
         #region variable
 
@@ -28,7 +28,7 @@ namespace BlackTundra.World.Interaction.Interactors {
         private float range = 4.0f;
 
         /// <summary>
-        /// Current <see cref="IInteractable"/> that the <see cref="RayInteractor"/> is continuously hitting with a raycast.
+        /// Current <see cref="IInteractable"/> that the <see cref="ActionBasedDragInteractor"/> is continuously hitting with a raycast.
         /// </summary>
         private IInteractable interactable = null;
 

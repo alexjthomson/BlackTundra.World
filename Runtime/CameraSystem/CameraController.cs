@@ -505,7 +505,7 @@ namespace BlackTundra.World.CameraSystem {
             if (CameraShakeSource.HasSample()) { // a sample can be taken for camera shake
                 Vector3 shake = CameraShakeSource.Sample(transform.position); // sample camera shake
                 float sqrMagnitude = shake.sqrMagnitude; // calculate the square magnitude of the camera shake
-                if (sqrMagnitude > 0.2f) { // a significant amount of shake exists
+                if (sqrMagnitude > Mathf.Epsilon) { // a significant amount of shake exists
                     finalPosition += rotation * shake; // add the shake to the final camera position
                     updateTransform = true; // the transform needs updating
                     if (ControlUser != null) { // a control user exists for the camera controller
@@ -565,6 +565,30 @@ namespace BlackTundra.World.CameraSystem {
             ) {
                 tag = CameraControllerTag
             }.GetComponent<CameraController>();
+        }
+
+        #endregion
+
+        #region IsVisible
+
+        /// <summary>
+        /// Tests if a <paramref name="renderer"/> is visible to this <see cref="CameraController"/> instance.
+        /// </summary>
+        /// <returns>Returns <c>true</c> if the <paramref name="renderer"/> is visible to this <see cref="CameraController"/> instance.</returns>
+        public bool IsVisible(in Renderer renderer) {
+            if (renderer == null) throw new ArgumentNullException(nameof(renderer));
+            Plane[] planes = GeometryUtility.CalculateFrustumPlanes(camera);
+            return GeometryUtility.TestPlanesAABB(planes, renderer.bounds);
+        }
+
+        /// <summary>
+        /// Tests if a <paramref name="collider"/> is visible to this <see cref="CameraController"/> instance.
+        /// </summary>
+        /// <returns>Returns <c>true</c> if the <paramref name="collider"/> is visible to this <see cref="CameraController"/> instance.</returns>
+        public bool IsVisible(in Collider collider) {
+            if (collider == null) throw new ArgumentNullException(nameof(collider));
+            Plane[] planes = GeometryUtility.CalculateFrustumPlanes(camera);
+            return GeometryUtility.TestPlanesAABB(planes, collider.bounds);
         }
 
         #endregion

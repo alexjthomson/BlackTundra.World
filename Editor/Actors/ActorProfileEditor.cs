@@ -18,13 +18,13 @@ namespace BlackTundra.World.Editor.Actors {
         private const int GeneralToolbarIndex = 0;
         private const int PathFindingToolbarIndex = 1;
         private const int VisionToolbarIndex = 2;
-        private const int HearingToolbarIndex = 3;
+        private const int SoundToolbarIndex = 3;
 
         private static readonly GUIContent[] ToolbarElements = new GUIContent[] {
             new GUIContent("General"),
             new GUIContent("Path Finding"),
             new GUIContent("Vision"),
-            new GUIContent("Hearing"),
+            new GUIContent("Sound"),
         };
 
         //private const string Locomotion_BaseSpeed_Description = "Base speed that the actor will default to move at.";
@@ -39,14 +39,10 @@ namespace BlackTundra.World.Editor.Actors {
         private static readonly GUIContent PathFinding_BaseObstacleAvoidanceType_Content = new GUIContent("Obstacle Avoidance Type", PathFinding_BaseObstacleAvoidanceType_Description);
 
         private const string Vision_SensorPosition_Description = "The sensor position is the local position relative to the actor that the vision sensors are located. The center of vision is always pointing in the forwards direction.";
-        private const string Vision_SensorRange_Description = "The sensor range (in meters) is the distance from the sensor position at which objects are still visible and identifyable to the actor.";
-        private const string Vision_PeripheralVisionRadius_Description = "The vision sensor can utilize peripheral vision which acts as a sphere around the sensor position that makes up part of the area the actor can see in. This is the radius (in meters) of that sphere.";
-        private const string Vision_FieldOfView_Description = "Field of view (in degrees) that the vision sensor can see in.";
-        private const string Vision_LayerMask_Description = "Layer mask that indicates which layers are visible/invisible to the vision sensor/actor.";
+        private const string Vision_SensorReference_Description = "Visual sensor to use to allow the actor to visually detect colliders.";
 
-        private const string Hearing_SensorPosition_Description = "The sensor position is the local position relative to the actor that the audio sensors are located.";
-        private const string Hearing_SensorRange_Description = "The sensor range (in meters) is the distance from the sensor position at which sounds can be percieved by the actor.";
-        private const string Hearing_ThresholdIntensity_Description = "The threshold intensity is the minimum relative intensity of a sound that can be percieved by the actor.";
+        private const string Sound_SensorPosition_Description = "The sensor position is the local position relative to the actor that the audio sensors are located.";
+        private const string Sound_SensorReference_Description = "Sound sensor to use to allow the actor to detect sounds.";
 
         #endregion
 
@@ -240,90 +236,46 @@ namespace BlackTundra.World.Editor.Actors {
                     break;
                 }
                 case VisionToolbarIndex: { // vision
-                    EditorLayout.Title("Visual Perception");
+                    EditorLayout.Title("Vision Sensor");
 
-                    // visual sensor position:
-                    Vector3 ov3 = profile.visualSensorPosition;
-                    Vector3 nv3 = EditorLayout.Vector3Field("Sensor Position", ov3);
+                    // vision sensor position:
+                    Vector3 ov3 = profile.visionSensorOffset;
+                    Vector3 nv3 = EditorLayout.Vector3Field("Sensor Offset", ov3);
                     EditorLayout.Info(Vision_SensorPosition_Description);
                     if (nv3 != ov3) {
-                        profile.visualSensorPosition = nv3;
+                        profile.visionSensorOffset = nv3;
                         dirty = true;
                     }
                     EditorLayout.Space();
 
-                    float of, nf;
-                    // visial perception/sensor distance:
-                    of = profile.visualPerceptionDistance;
-                    nf = Mathf.Max(EditorLayout.FloatField("Sensor Range", of), 0.0f);
-                    EditorLayout.Info(Vision_SensorRange_Description);
-                    if (nf != of) {
-                        profile.visualPerceptionDistance = nf;
+                    // vision sensor reference:
+                    ScriptableObject currentSensor = profile.visionSensorAsset;
+                    ScriptableObject selectedSensor = EditorLayout.ReferenceField(currentSensor, false);
+                    EditorLayout.Info(Vision_SensorReference_Description);
+                    if (currentSensor != selectedSensor && selectedSensor is IVisionSensor) {
+                        profile.visionSensorAsset = selectedSensor;
                         dirty = true;
                     }
-                    EditorLayout.Space();
-
-                    // peripheral vision radius:
-                    of = profile.visualPerveptionPeripheralVisionRadius;
-                    nf = Mathf.Clamp(EditorLayout.FloatField("Peripheral Vision Radius", of), 0.0f, profile.visualPerceptionDistance);
-                    EditorLayout.Info(Vision_PeripheralVisionRadius_Description);
-                    if (nf != of) {
-                        profile.visualPerveptionPeripheralVisionRadius = nf;
-                        dirty = true;
-                    }
-                    EditorLayout.Space();
-
-                    // field of view:
-                    of = profile.visualPerceptionFieldOfView;
-                    nf = Mathf.Clamp(EditorLayout.FloatField("Field of View", of * Mathf.Rad2Deg), 0.0f, 360f) * Mathf.Deg2Rad;
-                    EditorLayout.Info(Vision_FieldOfView_Description);
-                    if (!Mathf.Approximately(nf, of)) {
-                        profile.visualPerceptionFieldOfView = nf;
-                        dirty = true;
-                    }
-                    EditorLayout.Space();
-
-                    // layermask:
-                    LayerMask olm = profile.visualPerceptionLayerMask;
-                    LayerMask nlm = EditorLayout.LayerMaskField("Layermask", olm);
-                    EditorLayout.Info(Vision_LayerMask_Description);
-                    if (nlm != olm) {
-                        profile.visualPerceptionLayerMask = nlm;
-                        dirty = true;
-                    }
-                    EditorLayout.Space();
                     break;
                 }
-                case HearingToolbarIndex: { // hearing
-                    EditorLayout.Title("Auditory Perception");
+                case SoundToolbarIndex: { // hearing
+                    EditorLayout.Title("Sound Sensor");
 
                     // auditory sensor position:
-                    Vector3 ov3 = profile.auditorySensorPosition;
-                    Vector3 nv3 = EditorLayout.Vector3Field("Sensor Position", ov3);
-                    EditorLayout.Info(Hearing_SensorPosition_Description);
+                    Vector3 ov3 = profile.soundSensorOffset;
+                    Vector3 nv3 = EditorLayout.Vector3Field("Sensor Offset", ov3);
+                    EditorLayout.Info(Sound_SensorPosition_Description);
                     if (nv3 != ov3) {
-                        profile.auditorySensorPosition = nv3;
+                        profile.soundSensorOffset = nv3;
                         dirty = true;
                     }
                     EditorLayout.Space();
 
-                    float of, nf;
-                    // auditory preception/sensor range:
-                    of = profile.auditoryPerceptionRange;
-                    nf = EditorLayout.FloatField("Sensor Range", of);
-                    EditorLayout.Info(Hearing_SensorRange_Description);
-                    if (nf != of) {
-                        profile.auditoryPerceptionRange = nf;
-                        dirty = true;
-                    }
-                    EditorLayout.Space();
-
-                    // auditory perception/sensor threshold intensity:
-                    of = profile.auditoryPerceptionThresholdIntensity;
-                    nf = EditorLayout.FloatField("Threshold Intensity", of);
-                    EditorLayout.Info(Hearing_ThresholdIntensity_Description);
-                    if (nf != of) {
-                        profile.auditoryPerceptionThresholdIntensity = nf;
+                    ScriptableObject currentSensor = profile.soundSensorAsset;
+                    ScriptableObject selectedSensor = EditorLayout.ReferenceField(currentSensor, false);
+                    EditorLayout.Info(Sound_SensorReference_Description);
+                    if (currentSensor != selectedSensor && selectedSensor is ISoundSensor) {
+                        profile.soundSensorAsset = selectedSensor;
                         dirty = true;
                     }
                     break;

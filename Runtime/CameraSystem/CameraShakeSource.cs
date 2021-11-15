@@ -120,6 +120,10 @@ namespace BlackTundra.World.CameraSystem {
         /// Roughness of the shake caused by the <see cref="CameraShakeSource"/>.
         /// A higher value will result in a rougher shake.
         /// </summary>
+        /// <remarks>
+        /// This roughly equates to the number of shakes per second. A value of <c>1.0</c> will result in very little shake while a value of <c>60.0</c> will equate to
+        /// a standard amount of shake.
+        /// </remarks>
 #pragma warning disable IDE1006 // naming styles
         public float roughness {
 #pragma warning restore IDE1006 // naming styles
@@ -180,23 +184,31 @@ namespace BlackTundra.World.CameraSystem {
         #endregion
 
         #region constructor
-
-        /// <summary>
-        /// Creates a blank <see cref="CameraShakeSource"/> that is by default not playing.
-        /// </summary>
-        public CameraShakeSource() {
-            _magnitude = 1.0f;
-            _roughness = 1.0f;
-            _loop = false;
-            position = Vector3.zero;
-            scale = Vector3.one;
-            lifetime = 1.0f;
-            fadeInTime = 0.25f;
-            fadeOutTime = 0.75f;
-            seed = Random.Range(-5000.0f, 5000.0f);
+        
+        private CameraShakeSource(
+            in float magnitude,
+            in float roughness,
+            in bool loop,
+            in Vector3 position,
+            in Vector3 scale,
+            in float lifetime,
+            in float fadeInTime,
+            in float fadeOutTime,
+            in float seed,
+            in bool playing
+        ) {
+            _magnitude = magnitude;
+            _roughness = roughness;
+            _loop = loop;
+            this.position = position;
+            this.scale = scale;
+            this.lifetime = lifetime;
+            this.fadeInTime = fadeInTime;
+            this.fadeOutTime = fadeOutTime;
+            this.seed = seed;
             phase = 0.0f;
             loopOffset = 0.0f;
-            playing = false;
+            this.playing = playing;
             changed = true;
             shake = Vector3.zero;
         }
@@ -221,6 +233,10 @@ namespace BlackTundra.World.CameraSystem {
                 SourceBuffer[i].InternalUpdate(deltaTime);
             }
         }
+
+        #endregion
+
+        #region InternalUpdate
 
         private void InternalUpdate(in float deltaTime) {
             if (!playing) return; // not playing
@@ -320,6 +336,72 @@ namespace BlackTundra.World.CameraSystem {
             playing = false; // set as not playing
             shake = Vector3.zero;
             changed = false;
+        }
+
+        #endregion
+
+        #region CreateAt
+
+        public static CameraShakeSource CreateAt(in Vector3 position, in bool playing = true) => CreateAt(
+            1.0f, 1.0f, false, position, Vector3.one, 1.0f, 0.25f, 0.75f, Random.Range(-12500.0f, 12500.0f), playing
+        );
+
+        public static CameraShakeSource CreateAt(in Vector3 position, in float magnitude, in float roughness, in bool loop, in bool playing = true) => CreateAt(
+            magnitude, roughness, loop, position, Vector3.one, 1.0f, 0.25f, 0.75f, Random.Range(-12500.0f, 12500.0f), playing
+        );
+
+        public static CameraShakeSource CreateAt(in Vector3 position, in float magnitude, in float roughness, in bool loop, in float lifetime, in bool playing = true) => CreateAt(
+            magnitude, roughness, loop, position, Vector3.one, lifetime, lifetime * 0.25f, lifetime * 0.75f, Random.Range(-12500.0f, 12500.0f), playing
+        );
+
+        public static CameraShakeSource CreateAt(in Vector3 position, in float magnitude, in float roughness, in bool loop, in float lifetime, in float fadeTime, in bool playing = true) => CreateAt(
+            magnitude, roughness, loop, position, Vector3.one, lifetime, fadeTime, lifetime - fadeTime, Random.Range(-12500.0f, 12500.0f), playing
+        );
+
+        public static CameraShakeSource CreateAt(in Vector3 position, in float magnitude, in float roughness, in bool loop, in float lifetime, in float fadeInTime, in float fadeOutTime, in bool playing = true) => CreateAt(
+            magnitude, roughness, loop, position, Vector3.one, lifetime, fadeInTime, lifetime - fadeOutTime, Random.Range(-12500.0f, 12500.0f), playing
+        );
+
+        public static CameraShakeSource CreateAt(in Vector3 position, in float magnitude, in float roughness, in bool loop, in float lifetime, in float fadeInTime, in float fadeOutTime, in Vector3 scale, in bool playing = true) => CreateAt(
+            magnitude, roughness, loop, position, scale, lifetime, fadeInTime, lifetime - fadeOutTime, Random.Range(-12500.0f, 12500.0f), playing
+        );
+
+        private static CameraShakeSource CreateAt(
+            in float magnitude,
+            in float roughness,
+            in bool loop,
+            in Vector3 position,
+            in Vector3 scale,
+            in float lifetime,
+            in float fadeInTime,
+            in float fadeOutTime,
+            in float seed,
+            in bool playing
+        ) {
+            if (magnitude < 0.0f) throw new ArgumentOutOfRangeException(nameof(magnitude));
+            if (roughness < 0.0f) throw new ArgumentOutOfRangeException(nameof(roughness));
+            if (lifetime < 0.0f) throw new ArgumentOutOfRangeException(nameof(lifetime));
+            if (fadeInTime < 0.0f) throw new ArgumentOutOfRangeException(nameof(fadeInTime));
+            if (fadeOutTime < 0.0f) throw new ArgumentOutOfRangeException(nameof(fadeOutTime));
+            if (fadeInTime > fadeOutTime) throw new ArgumentOutOfRangeException(nameof(fadeInTime));
+            if (fadeOutTime > lifetime) throw new ArgumentOutOfRangeException(nameof(fadeOutTime));
+            CameraShakeSource instance = new CameraShakeSource(
+                magnitude,
+                roughness,
+                loop,
+                position,
+                scale,
+                lifetime,
+                fadeInTime,
+                fadeOutTime,
+                seed,
+                playing
+            );
+            if (playing) {
+                if (SourceBuffer.IsFull) SourceBuffer.Expand(SourceBufferExpandSize); // check if the buffer is full and expand if required
+                SourceBuffer.AddLast(instance, true); // add the source to the buffer
+            }
+            return instance;
         }
 
         #endregion

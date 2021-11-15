@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 
 using BlackTundra.Foundation.Utility;
+using BlackTundra.World.Audio;
 
 using UnityEngine;
 using UnityEngine.AI;
@@ -110,16 +111,25 @@ namespace BlackTundra.World.Actors {
 
         #endregion
 
-        #region OnEvaluateObject
+        #region OnColliderVisible
 
         /// <summary>
-        /// Invoked when an object should be evaluated to assess its importance to the <see cref="actor"/>.
+        /// Invoked when a <see cref="Collider"/> is discovered to be visible to the <see cref="actor"/>.
         /// </summary>
-        /// <param name="collider"><see cref="Collider"/> to assess.</param>
-        protected abstract void OnEvaluateObject(in Collider collider);
+        protected abstract void OnColliderVisible(in Collider collider);
 
         #endregion
 
+        #region OnSoundHeard
+
+        /// <summary>
+        /// Invoked when a <see cref="SoundSample"/> is heard by the <see cref="actor"/>.
+        /// </summary>
+        protected abstract void OnSoundHeard(in SoundSample soundSample);
+
+        #endregion
+
+        /*
         #region EvaluateObject
 
         /// <summary>
@@ -139,7 +149,6 @@ namespace BlackTundra.World.Actors {
         }
 
         #endregion
-
         #region EvaluateObjects
 
         /// <summary>
@@ -209,6 +218,34 @@ namespace BlackTundra.World.Actors {
                 }
             } finally {
                 colliders.Dispose();
+            }
+        }
+
+        #endregion
+        */
+
+        #region QueryVisualPerception
+
+        /// <summary>
+        /// Queries the visual perception of the <see cref="actor"/>. This invokes <see cref="OnEvaluateObject(in Collider)"/> when an object is spotted.
+        /// </summary>
+        protected void QueryVisualPerception() {
+            using (IEnumerator<Collider> visibleColliders = actor.QueryVisualPerception()) {
+                while (visibleColliders.MoveNext()) {
+                    OnColliderVisible(visibleColliders.Current);
+                }
+            }
+        }
+
+        #endregion
+
+        #region QueryAuditoryPerception
+
+        protected void QueryAuditoryPerception() {
+            using (IEnumerator<SoundSample> soundSamples = actor.QueryAuditoryPerception()) {
+                while (soundSamples.MoveNext()) {
+                    OnSoundHeard(soundSamples.Current);
+                }
             }
         }
 

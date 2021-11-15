@@ -11,6 +11,7 @@ using Random = UnityEngine.Random;
 
 namespace BlackTundra.World.Editor {
 
+    [CanEditMultipleObjects]
     [CustomEditor(typeof(Volume))]
     public sealed class VolumeEditor : CustomInspector {
 

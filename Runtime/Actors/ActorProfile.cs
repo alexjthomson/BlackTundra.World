@@ -4,9 +4,11 @@ using UnityEngine.AI;
 namespace BlackTundra.World.Actors {
 
 #if UNITY_EDITOR
-    [CreateAssetMenu(fileName = "ActorProfile", menuName = "Settings/Actors/Actor Profile", order = -1)]
+    [CreateAssetMenu(menuName = "Configuration/Actor/Profile", fileName = "ActorProfile", order = 0)]
 #endif
     public sealed class ActorProfile : ScriptableObject {
+
+        #region variable
 
 #if UNITY_EDITOR
         [Header("General")]
@@ -76,54 +78,61 @@ namespace BlackTundra.World.Actors {
         [SerializeField] internal int areaMask = 0;
 
 #if UNITY_EDITOR
-        [Header("Visual Perception")]
+        [Header("Vision Sensor")]
 #endif
 
         /// <summary>
         /// Local position of the <see cref="Actor"/> vision sensor.
         /// </summary>
-        [SerializeField] internal Vector3 visualSensorPosition = new Vector3(0.0f, 1.8f, 0.0f);
+        [SerializeField] internal Vector3 visionSensorOffset = new Vector3(0.0f, 1.8f, 0.0f);
 
         /// <summary>
-        /// Maximum distance that the <see cref="Actor"/> can see.
+        /// <see cref="IVisionSensor"/> used for <see cref="Actor"/> vision.
         /// </summary>
-        [SerializeField] internal float visualPerceptionDistance = 50.0f;
+        [SerializeField] internal ScriptableObject visionSensorAsset = null;
+
 
         /// <summary>
-        /// LayerMask describing what layers will block line of sight for the <see cref="Actor"/>.
-        /// This includes all layers that are visible.
-        /// Transparent layers shouldn't be included in this layer.
+        /// Cached <see cref="IVisionSensor"/> from <see cref="visionSensorAsset"/>.
         /// </summary>
-        [SerializeField] internal LayerMask visualPerceptionLayerMask = -1;
-
-        /// <summary>
-        /// Field of view in radians that the <see cref="Actor"/> can see in.
-        /// </summary>
-        [SerializeField] internal float visualPerceptionFieldOfView = 120.0f * Mathf.Deg2Rad;
-
-        /// <summary>
-        /// Radius of peripheral vision around the <see cref="Actor"/> visual sensor.
-        /// </summary>
-        [SerializeField] internal float visualPerveptionPeripheralVisionRadius = 1.5f;
+        internal IVisionSensor visionSensor = null;
 
 #if UNITY_EDITOR
-        [Header("Auditory Perception")]
+        [Header("Sound Sensor")]
 #endif
 
         /// <summary>
         /// Local position of the actor's auditory sensor.
         /// </summary>
-        [SerializeField] internal Vector3 auditorySensorPosition = new Vector3(0.0f, 1.8f, 0.0f);
+        [SerializeField] internal Vector3 soundSensorOffset = new Vector3(0.0f, 1.8f, 0.0f);
 
         /// <summary>
-        /// Minimum relative intensity of a sound that the actor can perceive.
+        /// <see cref="ISoundSensor"/> used for <see cref="Actor"/> sound detection.
         /// </summary>
-        [SerializeField] internal float auditoryPerceptionThresholdIntensity = 0.1f;
+        [SerializeField] internal ScriptableObject soundSensorAsset = null;
 
         /// <summary>
-        /// Distance from the actor's auditory sensor that the actor can still hear audio.
+        /// Cached <see cref="ISoundSensor"/> from <see cref="soundSensorAsset"/>.
         /// </summary>
-        [SerializeField] internal float auditoryPerceptionRange = 32.0f;
+        internal ISoundSensor soundSensor = null;
+
+        #endregion
+
+        #region logic
+
+        #region Initialise
+
+        /// <summary>
+        /// Invoke this before the <see cref="ActorProfile"/> is used. This ensures it is setup correctly.
+        /// </summary>
+        internal void Initialise() {
+            if (visionSensor == null) visionSensor = (IVisionSensor)visionSensorAsset;
+            if (soundSensor == null) soundSensor = (ISoundSensor)soundSensorAsset;
+        }
+
+        #endregion
+
+        #endregion
 
     }
 

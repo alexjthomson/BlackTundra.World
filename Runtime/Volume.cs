@@ -119,10 +119,33 @@ namespace BlackTundra.World {
 
         private void Awake() {
             GetCollider();
-            VolumeList.Add(this);
             RecalculateTagHashCodes();
         }
 
+        #endregion
+
+        #region OnEnable
+
+        private void OnEnable() {
+            VolumeList.Add(this); // add to the list of all volumes
+        }
+
+        #endregion
+
+        #region OnDisable
+
+        private void OnDisable() {
+            VolumeList.Remove(this); // remove from the list of all volumes
+        }
+
+        #endregion
+
+        #region OnDestroy
+        /*
+        private void OnDestroy() {
+            VolumeList.Remove(this); // remove from the list of all volumes
+        }
+        */
         #endregion
 
         #region RecalculateTagHashCodes
@@ -131,14 +154,6 @@ namespace BlackTundra.World {
             int tagCount = _tags.Length;
             if (tagHashCodes == null || tagHashCodes.Length != tagCount) tagHashCodes = new int[tagCount];
             for (int i = tagCount - 1; i >= 0; i--) tagHashCodes[i] = _tags[i].GetHashCode();
-        }
-
-        #endregion
-
-        #region OnDestroy
-
-        private void OnDestroy() {
-            VolumeList.Remove(this); // remove from the list of all volumes
         }
 
         #endregion
@@ -172,6 +187,68 @@ namespace BlackTundra.World {
                 if (hash == tagHashCodes[i]) return true;
             }
             return false;
+        }
+
+        /// <param name="tags">Tags to check for.</param>
+        /// <param name="any">When true, the method will return <c>true</c> if just one of the tags in the <paramref name="tags"/> parameter is present.</param>
+        /// <returns>
+        /// Returns <c>true</c> if the <see cref="Volume"/> has either all <paramref name="tags"/> (if <paramref name="any"/> is <c>false</c>) or just one of the
+        /// <paramref name="tags"/> (if <paramref name="any"/> is <c>true</c>).
+        /// </returns>
+        private bool HasTag(in string[] tags, in bool any) {
+            if (tags == null) throw new ArgumentNullException(nameof(tags));
+            int hashCode;
+            if (any) {
+                for (int i = tags.Length - 1; i >= 0; i--) {
+                    hashCode = tags[i].GetHashCode();
+                    for (int j = tagHashCodes.Length - 1; j >= 0; j--) {
+                        if (tagHashCodes[j] == hashCode) return true;
+                    }
+                }
+                return false;
+            } else {
+                bool missing;
+                for (int i = tags.Length - 1; i >= 0; i--) {
+                    missing = true;
+                    hashCode = tags[i].GetHashCode();
+                    for (int j = tagHashCodes.Length - 1; j >= 0; j--) {
+                        if (tagHashCodes[j] == hashCode) {
+                            missing = false;
+                            break;
+                        }
+                    }
+                    if (missing) return false; // this tag is missing
+                }
+                return true; // all tags found
+            }
+        }
+
+        private bool HasTag(in int[] tags, in bool any) {
+            if (tags == null) throw new ArgumentNullException(nameof(tags));
+            int hashCode;
+            if (any) {
+                for (int i = tags.Length - 1; i >= 0; i--) {
+                    hashCode = tags[i];
+                    for (int j = tagHashCodes.Length - 1; j >= 0; j--) {
+                        if (tagHashCodes[j] == hashCode) return true;
+                    }
+                }
+                return false;
+            } else {
+                bool missing;
+                for (int i = tags.Length - 1; i >= 0; i--) {
+                    missing = true;
+                    hashCode = tags[i];
+                    for (int j = tagHashCodes.Length - 1; j >= 0; j--) {
+                        if (tagHashCodes[j] == hashCode) {
+                            missing = false;
+                            break;
+                        }
+                    }
+                    if (missing) return false; // this tag is missing
+                }
+                return true; // all tags found
+            }
         }
 
         #endregion
@@ -221,9 +298,11 @@ namespace BlackTundra.World {
         /// Queries the <see cref="Volume"/> instances that have influence on the provided <paramref name="point"/>.
         /// </summary>
         /// <param name="point">Point in world-space to query.</param>
-        /// <param name="layermask"><see cref="LayerMask"/> to use to find <see cref="Volume"/> instances.</param>
+        /// <param name="layerMask"><see cref="LayerMask"/> to use to find <see cref="Volume"/> instances.</param>
+        /// <param name="tags">Tags to get. Leave empty to get any tag.</param>
         /// <returns>Returns every <see cref="VolumeHit"/> that occurs during the query.</returns>
-        public static IEnumerator<VolumeHit> QueryPoint(Vector3 point, LayerMask layermask) {
+        public static IEnumerator<VolumeHit> QueryPoint(Vector3 point, LayerMask layerMask, params string[] tags) {
+            if (tags == null) throw new ArgumentNullException(nameof(tags));
             Volume volume; // used to store a reference to the current volume
             for (int i = VolumeList.Count - 1; i >= 0; i--) { // iterate each volume
                 volume = VolumeList[i]; // get the current volume
@@ -231,7 +310,7 @@ namespace BlackTundra.World {
                     VolumeList.RemoveAt(i); // remove from list
                     continue; // continue
                 }
-                if (!volume.enabled || (volume.gameObject.layer & layermask) == 0) continue; // volume is not enabled
+                if (!volume.enabled || ((1 << volume.gameObject.layer) & layerMask) == 0) continue; // volume is not enabled
                 Vector3 closestPoint = volume.collider.ClosestPoint(point); // get the closest point on the collider to the point
                 float sqrDistance = (closestPoint - point).sqrMagnitude; // calculate the square distance from the point to the closest point
                 float sqrBlendDistance = volume._blendDistance * volume._blendDistance;
@@ -242,6 +321,40 @@ namespace BlackTundra.World {
                  * volume would always have total influence.
                  */
                 if (sqrDistance > sqrBlendDistance) continue; // volume has no influence
+
+                if (tags.Length > 0 && !volume.HasTag(tags, true)) continue; // volume doesn't have any of the required tags
+
+                // calculate the influence that the volume will have:
+                float influence = sqrBlendDistance > 0.0f
+                    ? 1.0f - (sqrDistance / sqrBlendDistance)
+                    : 1.0f;
+
+                yield return new VolumeHit(volume, point, influence * volume._weight); // return that this volume was hit
+            }
+        }
+
+        public static IEnumerator<VolumeHit> QueryPoint(Vector3 point, LayerMask layerMask, params int[] hashes) {
+            if (hashes == null) throw new ArgumentNullException(nameof(hashes));
+            Volume volume; // used to store a reference to the current volume
+            for (int i = VolumeList.Count - 1; i >= 0; i--) { // iterate each volume
+                volume = VolumeList[i]; // get the current volume
+                if (volume == null) { // null reference (shoud not happen)
+                    VolumeList.RemoveAt(i); // remove from list
+                    continue; // continue
+                }
+                if (!volume.enabled || ((1 << volume.gameObject.layer) & layerMask) == 0) continue; // volume is not enabled
+                Vector3 closestPoint = volume.collider.ClosestPoint(point); // get the closest point on the collider to the point
+                float sqrDistance = (closestPoint - point).sqrMagnitude; // calculate the square distance from the point to the closest point
+                float sqrBlendDistance = volume._blendDistance * volume._blendDistance;
+
+                /* Note:
+                 * Volume doesn't do anything when `sqrDistance = sqrBlendDistance`, but we can't
+                 * use a >= comparison as sqrBlendDistance could be set to 0, in which case, the
+                 * volume would always have total influence.
+                 */
+                if (sqrDistance > sqrBlendDistance) continue; // volume has no influence
+
+                if (hashes.Length > 0 && !volume.HasTag(hashes, true)) continue; // volume doesn't have any of the required tags
 
                 // calculate the influence that the volume will have:
                 float influence = sqrBlendDistance > 0.0f
@@ -272,7 +385,7 @@ namespace BlackTundra.World {
                     VolumeList.RemoveAt(i); // remove from list
                     continue; // continue
                 }
-                if (!volume.enabled || (volume.gameObject.layer & layermask) == 0 || !volume.HasTag(hash)) continue; // volume is not enabled
+                if (!volume.enabled || ((1 << volume.gameObject.layer) & layermask) == 0 || !volume.HasTag(hash)) continue; // volume is not enabled
                 Vector3 closestPoint = volume.collider.ClosestPoint(point); // get the closest point on the collider to the point
                 float sqrDistance = (closestPoint - point).sqrMagnitude; // calculate the square distance from the point to the closest point
                 float sqrBlendDistance = volume._blendDistance * volume._blendDistance;

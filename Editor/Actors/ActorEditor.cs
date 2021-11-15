@@ -36,7 +36,7 @@ namespace BlackTundra.World.Editor.Actors {
                 actor.SetupAgent();
                 MarkAsDirty(agent);
             }
-            agent.hideFlags = UnityEngine.HideFlags.HideInInspector;
+            //agent.hideFlags = UnityEngine.HideFlags.HideInInspector;
         }
 
         protected sealed override void DrawInspector() {
@@ -46,7 +46,7 @@ namespace BlackTundra.World.Editor.Actors {
             CapsuleCollider collider = actor.GetComponent<CapsuleCollider>();
             bool oldUseCollider;
             if (collider != null) {
-                collider.hideFlags = HideFlags.HideInInspector;
+                //collider.hideFlags = HideFlags.HideInInspector;
                 oldUseCollider = collider.enabled;
             } else {
                 oldUseCollider = false;

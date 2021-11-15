@@ -104,6 +104,11 @@ namespace BlackTundra.World.Actors {
         /// </summary>
         private static int batchStartIndex = ActorBufferBatchUpdateSize;
 
+        /// <summary>
+        /// Instance of <see cref="NavMeshPath"/> that is cached and used for nav mesh calculations where a <see cref="NavMeshPath"/> instance is required.
+        /// </summary>
+        private static NavMeshPath calculationPathInstance = null;
+
         #endregion
 
         #region property
@@ -307,9 +312,6 @@ namespace BlackTundra.World.Actors {
                 if (value) {
                     if (collider == null) {
                         collider = gameObject.ForceGetComponent<CapsuleCollider>();
-#if UNITY_EDITOR
-                        collider.hideFlags = HideFlags.HideInInspector;
-#endif
                     } else {
                         collider.enabled = true;
                     }
@@ -333,8 +335,8 @@ namespace BlackTundra.World.Actors {
         #region Awake
 
         private void Awake() {
-            // Awake is primarily used to get and test references.
             Console.AssertReference(profile);
+            profile.Initialise();
             SetupAgent();
         }
 
@@ -399,6 +401,11 @@ namespace BlackTundra.World.Actors {
         private
 #endif
         void SetupCollider() {
+            if (collider == null) {
+                collider = GetComponent<CapsuleCollider>();
+                if (collider == null) return;
+            }
+            if (agent == null) SetupAgent();
             float height = agent.height;
             collider.height = height;
             collider.radius = agent.radius;
@@ -518,7 +525,7 @@ namespace BlackTundra.World.Actors {
         /// </summary>
         public void SetTargetCollider(in Collider target) {
             if (target == null) throw new ArgumentNullException(nameof(target)); // the target is null
-            Collider nextTarget = profile.visualPerceptionLayerMask.ContainsLayer(target.gameObject.layer) ? target : null; // the target is visible
+            Collider nextTarget = profile.visionSensor.IsDetectable(target) ? target : null; // the target is visible
             if (nextTarget != targetCollider) { // the next target collider is different to the current collider
                 targetCollider = nextTarget;
                 updateTarget = true;
@@ -590,12 +597,52 @@ namespace BlackTundra.World.Actors {
 
         #endregion
 
+        #region IsWithinRangeOfTarget
+
+        /// <summary>
+        /// Tests if the <see cref="Actor"/> is within a specific <paramref name="range"/> of the <see cref="TargetPosition"/>.
+        /// </summary>
+        /// <returns>Returns <c>true</c> if the <see cref="Actor"/> is within the specified <paramref name="range"/> of the <see cref="TargetPosition"/>.</returns>
+        public bool IsWithinRangeOfTarget(in float range) {
+            if (range < 0.0f) throw new ArgumentOutOfRangeException(nameof(range));
+            Vector3 actorPosition = transform.position;
+            float x = targetPosition.x - actorPosition.x;
+            float z = targetPosition.z - actorPosition.z;
+            float sqrXZDistance = (x * x) + (z * z);
+            float sqrRange = range * range;
+            if (sqrXZDistance > sqrRange) return false; // outside of range
+            float y = targetPosition.y - actorPosition.y;
+            float sqrDistance = sqrXZDistance + (y * y);
+            if (sqrDistance > sqrRange) return false; // outside of range
+            NavMeshPath agentPath = agent.path;
+            if (agentPath == null) return true; // within distance of target
+            Vector3[] points = agentPath.corners;
+            if (points.Length > 1) {
+                float distance = 0.0f;
+                for (int i = points.Length - 1; i >= 1;) {
+                    distance += (points[i] - points[--i]).magnitude;
+                }
+                if (distance > range) return false; // path length greater than range range
+            }
+            return true; // all checks passed
+        }
+
+        #endregion
+
         #region IsVisible
 
         /// <returns>
         /// Returns <c>true</c> if the <paramref name="collider"/> is visible to the <see cref="Actor"/>.
         /// </returns>
-        public bool IsVisible(in Collider collider) => IsVisibleFrom(transform.position + (transform.rotation * profile.visualSensorPosition), transform.forward, collider);
+        public bool IsVisible(in Collider collider) {
+            IVisionSensor sensor = profile.visionSensor;
+            if (sensor == null) return false;
+            return sensor.IsVisibleFrom(
+                transform.position + (transform.rotation * profile.visionSensorOffset),
+                transform.forward,
+                collider
+            );
+        }
 
         #endregion
 
@@ -609,271 +656,9 @@ namespace BlackTundra.World.Actors {
         /// in the specified <paramref name="direction"/>.
         /// </returns>
         public bool IsVisibleFrom(in Vector3 point, Vector3 direction, in Collider collider) {
-            if (collider == null) throw new ArgumentNullException(nameof(collider));
-            if (!profile.visualPerceptionLayerMask.ContainsLayer(collider.gameObject.layer)) return false; // not in visible layer mask
-
-            Vector3 colliderPosition = collider.bounds.center;
-            Vector3 localPosition = colliderPosition - point; // convert collider position into local space
-
-            #region sphere check
-
-            /*
-             * This check makes sure that the collider is within the actors view distance.
-             * It does this by calculating the square distance in the x-z plane (which is
-             * used later) and checking that the x-z square distance is not a very small
-             * as this will later cause divide by zero errors.
-             * The x-z square distance is then turned into x-y-z squared distance and that
-             * value is compared against the square of the view distance.
-             * If the x-y-z square distance is more than the square view distance then the
-             * collider is outside of the actor view distance.
-             */
-
-            float sqrXZDistanceToTarget = (localPosition.x * localPosition.x) + (localPosition.z * localPosition.z); // get the distance to the target in the xz plane
-            if (sqrXZDistanceToTarget < 0.0001f) return true; // close enough that the entity is almost 0m away, therefore say the entity is visible as this will cause divide by zero errors later on
-
-            float sqrDistanceToTarget = sqrXZDistanceToTarget + (localPosition.y * localPosition.y);
-            if (sqrXZDistanceToTarget > profile.visualPerceptionDistance * profile.visualPerceptionDistance) return false; // out of range of view sphere
-
-            #endregion
-
-            #region field-of-view check
-
-            /*
-             * This check ensures that the target collider is within the actors field of view.
-             * This is done by finding the forward direction of the actor in the x, z plane
-             * and normalising the vector. This vector is then used as a direction vector in
-             * a line equation. Because the actor position is treated as [0, 0, 0], the line
-             * equation is simply "xF", where F is the normalised x-z forward vector and x
-             * is a real number. x also equals the distance to the closest point on the line
-             * to the collider. This is used with the previously calculated distance to the
-             * target collider to form a right angled triangle, where theta can be calculated.
-             * Theta is the angle FAT, where F is the forward direction, A is [0, 0, 0] (the
-             * actor position), and T is the local collider position. If the collider is within
-             * the actors field of view, then theta will be less than or equal to the actors
-             * field of view. Otherwise the collider is not within the actors field of view
-             * and is therefore not visible.
-             */
-
-            direction = new Vector3(direction.x, 0.0f, direction.z).normalized;
-
-            float distanceToClosestPointOnForwardLine = ((direction.x * localPosition.x) + (direction.z * localPosition.z)) / ((direction.x * direction.x) + (direction.z * direction.z)); // find the distance from the closest point on the line [A -> F] to the point T
-            float xzDistanceToTarget = Mathf.Sqrt(sqrXZDistanceToTarget); // find the x-z distance to the target entity
-            //float inverseXZDistanceToTarget = 1.0f / xzDistanceToTarget;
-
-            float theta = Mathf.Abs(Mathf.Acos(Mathf.Abs(distanceToClosestPointOnForwardLine) / xzDistanceToTarget)); // find theta inside right angled FAT triangle
-            if (distanceToClosestPointOnForwardLine < 0.0f) theta = Mathf.PI - theta; // correct the angle if it exceeds 90 degrees
-
-            if (Mathf.Abs(theta) > profile.visualPerceptionFieldOfView * 0.5f && sqrDistanceToTarget > profile.visualPerveptionPeripheralVisionRadius * profile.visualPerveptionPeripheralVisionRadius) return false; // outside field of view and peripheral vision
-
-            #endregion
-
-            #region line of sight check
-
-            Bounds bounds = collider.bounds; // find the bounds of the collider
-            Transform colliderTransform = collider.transform;
-
-            #region cast to center of bounds
-
-            if (QueryLineOfSight(point, bounds.center, colliderTransform)) return true; // cast a ray directly into the center of the target (fast check)
-
-            #endregion
-
-            #region find tangent direction
-
-            /*
-             * This is the 2D tangent to the line [Actor -> Target].
-             * This is calculated using existing variables to speed up trigonometric calculations.
-             * 
-             * Explanation:
-             * Let O = Origin (0, 0) (Actor Position)
-             *     T = Target Entity Position
-             *     f = Actor forward line (forward direction but in 2D space)
-             *     C = Closest Point on line f to point T
-             *     theta = Angle TOC
-             * Imagine a right angled triangle TOC, then extend line f infinitely. Another right angled
-             * triangle can be drawn on the line TC where at point C is the 90deg angle and point T is
-             * angle theta, the hypotenuse extends until it intersects line f, let the intersection be
-             * point I.
-             * The distance [T -> C] can be calculated as the distances [O -> C] and [O -> T] are both
-             * known so Pythagoras' Theorem can be used to find [T -> C].
-             * This intersection point I is important as the direction [I -> T] is equal to the tangent
-             * direction for the line [A -> T]. This is what is calculated below:
-             */
-
-            // use Pythagoras' Theorem to find the distance required to be added to the distanceToClosestPointOnForwardLine to get the distance to the tangent intersection
-            float tangentIntersectionDistance = distanceToClosestPointOnForwardLine + (Mathf.Sqrt(sqrXZDistanceToTarget - (distanceToClosestPointOnForwardLine * distanceToClosestPointOnForwardLine)) * Mathf.Tan(theta));
-
-            float tangentDirectionX = localPosition.x - (direction.x * tangentIntersectionDistance);
-            float tangentDirectionZ = localPosition.z - (direction.z * tangentIntersectionDistance);
-
-            // normalise:
-
-            float tangentNormaliseCoefficient = 1.0f / Mathf.Sqrt((tangentDirectionX * tangentDirectionX) + (tangentDirectionZ * tangentDirectionZ));
-            tangentDirectionX *= tangentNormaliseCoefficient;
-            tangentDirectionZ *= tangentNormaliseCoefficient;
-
-            #endregion
-
-            #region cast around center
-
-            /*
-            * Imagine the following box:
-            * 
-            * 100% #######tx#######
-            *      #              #
-            *      #  tl  tm  tr  #
-            *      #              #
-            *      #  cl  cm  cr  #
-            *      #              #
-            *      #  bl  bm  br  #
-            *      #              #
-            *      ################
-            *    0%               100%
-            *    
-            * where left (l) is 25% horizontally
-            *       middle (m) is 50% horizontally
-            *       right (r) is 75% horizontally
-            *       tx = top eXtended (used top of the collider
-            *       
-            * this repeats for top (t), center (c) and bottom (b) but vertically
-            * 
-            * Point cm has already been tested with bounds.center,
-            * so the remaining points need to be tested.
-            * 
-            * This is done to check if any other parts of the actor is showing.
-            * 25% around the edges is ignored.
-            * 
-            * The order the points are checked are:
-            * cm, tx, tm,
-            * cr, cl,
-            * tr, tl,
-            * bm, br, bl
-            * 
-            * This order is because the most likely place to be able to see the
-            * target is the top if them (as their head will likely be showing).
-            * The middle center is the next most likely, and the bottom is least
-            * likely as the bottom portion may be obstructed by small objects.
-            * 
-            * The actual box to cast rays is is created as a 2D box tangent to
-            * the line [Actor -> Target] (always vertical, but rotated about y axis).
-            * 
-            * This is calculated using the tangent calculated in the prior stage
-            * to this stage.
-            * See above for calculation.
-            */
-
-            Vector3 extents = bounds.extents;
-            float maxExtentSize = (extents.x > extents.z ? extents.x : extents.z) * 0.5f;
-
-            float dx = tangentDirectionX * maxExtentSize;
-            float dy = extents.y * 0.5f;
-            float dz = tangentDirectionZ * maxExtentSize;
-
-            return
-                QueryLineOfSight(
-                    point,
-                    new Vector3( // top extended
-                        colliderPosition.x,
-                        colliderPosition.y + (dy * 1.9f), // 1.9 = almost the top (2.0 would be the top)
-                        colliderPosition.z
-                    ),
-                    colliderTransform
-                ) || QueryLineOfSight(
-                    point,
-                    new Vector3( // top middle
-                        colliderPosition.x,
-                        colliderPosition.y + dy,
-                        colliderPosition.z
-                    ),
-                    colliderTransform
-                ) || QueryLineOfSight(
-                    point,
-                    new Vector3( // middle right
-                        colliderPosition.x + dx,
-                        colliderPosition.y,
-                        colliderPosition.z + dz
-                    ),
-                    colliderTransform
-                ) || QueryLineOfSight(
-                    point,
-                    new Vector3( // middle left
-                        colliderPosition.x - dx,
-                        colliderPosition.y,
-                        colliderPosition.z - dz
-                    ),
-                    colliderTransform
-                ) || QueryLineOfSight(
-                    point,
-                    new Vector3( // top right
-                        colliderPosition.x + dx,
-                        colliderPosition.y + dy,
-                        colliderPosition.z + dz
-                    ),
-                    colliderTransform
-                ) || QueryLineOfSight( // top left
-                    point,
-                    new Vector3(
-                        colliderPosition.x - dx,
-                        colliderPosition.y + dy,
-                        colliderPosition.z - dz
-                    ),
-                    colliderTransform
-                ) || QueryLineOfSight(
-                    point,
-                    new Vector3( // bottom middle
-                        colliderPosition.x,
-                        colliderPosition.y - dy,
-                        colliderPosition.z
-                    ),
-                    colliderTransform
-                ) || QueryLineOfSight(
-                    point,
-                    new Vector3( // bottom right
-                        colliderPosition.x + dx,
-                        colliderPosition.y - dy,
-                        colliderPosition.z + dz
-                    ),
-                    colliderTransform
-                ) || QueryLineOfSight(
-                    point,
-                    new Vector3( // bottom left
-                        colliderPosition.x - dx,
-                        colliderPosition.y - dy,
-                        colliderPosition.z - dz
-                    ),
-                    colliderTransform
-                );
-
-            #endregion
-
-            #endregion
-
-        }
-
-        #endregion
-
-        #region QueryLineOfSight
-
-        /// <summary>
-        /// Queries if the <see cref="Actor"/> can see a <paramref name="transform"/> when casting a line from the <paramref name="origin"/>
-        /// to the <paramref name="target"/> position. Both are positions in world-space.
-        /// </summary>
-        /// <param name="origin">Origin position of the ray in world-space.</param>
-        /// <param name="target">Target position of the ray in world-space. This is used to calculate a direction.</param>
-        /// <param name="transform"><see cref="Transform"/> component to test if is visible.</param>
-        /// <returns>Returns <c>true</c> if the <paramref name="transform"/> component is visible.</returns>
-        private bool QueryLineOfSight(in Vector3 origin, in Vector3 target, in Transform transform) {
-#if UNITY_EDITOR && ACTOR_DEBUG
-            Debug.DrawLine(origin, target, Color.cyan); // draw the line of sight
-#endif
-            return Physics.Raycast(
-                origin,
-                target - origin,
-                out RaycastHit hit,
-                profile.visualPerceptionDistance,
-                profile.visualPerceptionLayerMask
-            ) && hit.collider.transform == transform;
-
+            IVisionSensor sensor = profile.visionSensor;
+            if (sensor == null) return false;
+            return sensor.IsVisibleFrom(point, direction, collider);
         }
 
         #endregion
@@ -883,7 +668,14 @@ namespace BlackTundra.World.Actors {
         /// <summary>
         /// An expensive operation to query what colliders the <see cref="Actor"/> can see.
         /// </summary>
-        public IEnumerator<Collider> QueryVisualPerception() => QueryVisualPerceptionFrom(transform.position + (transform.rotation * profile.visualSensorPosition), transform.forward);
+        public IEnumerator<Collider> QueryVisualPerception() {
+            IVisionSensor sensor = profile.visionSensor;
+            if (sensor == null) return null;
+            return sensor.QueryVisualSensorFrom(
+                transform.position + (transform.rotation * profile.visionSensorOffset),
+                transform.forward
+            );
+        }
 
         #endregion
 
@@ -898,35 +690,33 @@ namespace BlackTundra.World.Actors {
         /// <param name="direction">Direction to look in.</param>
         /// <returns>Every <see cref="Collider"/> that the <see cref="Actor"/> can see.</returns>
         public IEnumerator<Collider> QueryVisualPerceptionFrom(Vector3 point, Vector3 direction) {
-            Collider[] colliders = Physics.OverlapSphere(point, profile.visualPerceptionDistance, profile.visualPerceptionLayerMask); // get all colliders in range of the actors visison
-            int colliderCount = colliders.Length;
-            if (colliderCount == 0) yield break;
-            Collider collider;
-            for (int i = colliderCount - 1; i >= 0; i--) { // iterate each collider in range
-                collider = colliders[i];
-                if (IsVisibleFrom(point, direction, collider)) {
-                    yield return collider;
-                }
-            }
+            IVisionSensor sensor = profile.visionSensor;
+            if (sensor == null) return null;
+            return sensor.QueryVisualSensorFrom(point, direction);
         }
 
         #endregion
 
         #region QueryAuditoryPerception
 
-        public IEnumerator<SoundSample> QueryAuditoryPerception() => Soundscape.QueryAt(
-            transform.position + (transform.rotation * profile.auditorySensorPosition),
-            profile.auditoryPerceptionRange,
-            profile.auditoryPerceptionThresholdIntensity
-        );
+        public IEnumerator<SoundSample> QueryAuditoryPerception() {
+            ISoundSensor sensor = profile.soundSensor;
+            if (sensor == null) return null;
+            return profile.soundSensor.QuerySoundSensorFrom(
+                transform.position + (transform.rotation * profile.soundSensorOffset),
+                transform.forward
+            );
+        }
 
         #endregion
 
         #region QueryAuditoryPerceptionFrom
 
-        public IEnumerator<SoundSample> QueryAuditoryPerceptionFrom(in Vector3 point) => Soundscape.QueryAt(
-            point, profile.auditoryPerceptionRange, profile.auditoryPerceptionThresholdIntensity
-        );
+        public IEnumerator<SoundSample> QueryAuditoryPerceptionFrom(in Vector3 point, in Vector3 direction) {
+            ISoundSensor sensor = profile.soundSensor;
+            if (sensor == null) return null;
+            return profile.soundSensor.QuerySoundSensorFrom(point, direction);
+        }
 
         #endregion
 
@@ -942,6 +732,54 @@ namespace BlackTundra.World.Actors {
         public float Damage(in object sender, float damage, in object data = null) {
             if (behaviour == null) return 0.0f; // no damage was delt
             return behaviour.OnActorDamaged(sender, damage, data);
+        }
+
+        #endregion
+
+        #region CalculateRandomPointInRange
+
+        /// <summary>
+        /// Calculates a random point within a specified <paramref name="range"/> from a <paramref name="point"/>.
+        /// </summary>
+        /// <param name="point">Centre point to generate the random point around.</param>
+        /// <param name="range">Maximum path distance from the <paramref name="point"/> that the random point can be generated at.</param>
+        /// <returns>
+        /// Returns a random point that is no further than <paramref name="range"/> from <paramref name="point"/>.
+        /// </returns>
+        public Vector3 CalculateRandomPointInRange(in Vector3 point, in float range) {
+            Vector2 circularPoint = MathsUtility.RandomPoint(
+                new Vector2(point.x, point.z),
+                range
+            );
+            Vector3 targetDestination = new Vector3(
+                point.x + circularPoint.x,
+                point.y,
+                point.z + circularPoint.y
+            );
+            if (calculationPathInstance == null) calculationPathInstance = new NavMeshPath();
+            else calculationPathInstance.ClearCorners(); // clear corners on calculation path instance
+            if (NavMesh.CalculatePath(point, targetDestination, agent.areaMask, calculationPathInstance)) { // a path was calculated successfully, limit the range
+                Vector3[] points = calculationPathInstance.corners; // get each point on the path
+                int pointCount = points.Length; // get the number of points on the path
+                if (pointCount == 1) return points[0]; // there is only one point on the path
+                float totalDistance = 0.0f; // cumulative total distance over the following iteration
+                float distance = 0.0f; // track the current distance
+                Vector3 deltaPosition; // track the vector from the last point to the current point
+                for (int i = 1; i < pointCount; i++) { // iterate each point
+                    deltaPosition = points[i] - points[i - 1]; // calculate the vector from the last point to the current point
+                    distance = deltaPosition.magnitude; // get the distance from the last point to the current point
+                    totalDistance += distance; // add the distance to the cumulative total distance
+                    if (totalDistance > range) { // the total distance is greater than the range
+                        float overshootAmount = totalDistance - range; // calculate by how many meters the range was overshot
+                        Vector3 direction = deltaPosition * (1.0f / distance); // calculate the direction from the last point to the overshot point
+                        Vector3 finalPoint = points[i - 1] + (direction * overshootAmount); // calculate the new final point
+                        return finalPoint; // return the new final point
+                    }
+                }
+                return points[pointCount - 1];
+            } else { // no path was calculated
+                return targetDestination; // return the target point
+            }
         }
 
         #endregion
