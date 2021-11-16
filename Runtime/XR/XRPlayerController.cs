@@ -64,7 +64,15 @@ namespace BlackTundra.World.XR {
         #region OnEnable
 
         private void OnEnable() {
-            this.GainControl();
+            this.GainControl(true);
+        }
+
+        #endregion
+
+        #region OnDisable
+
+        private void OnDisable() {
+            this.RevokeControl(true);
         }
 
         #endregion
@@ -85,7 +93,7 @@ namespace BlackTundra.World.XR {
 
         #region OnControlGained
 
-        public ControlFlags OnControlGained(in ControlUser user) {
+        public ControlFlags OnControlGained() {
             ConfigureCamera();
             return ControlFlags.HideCursor | ControlFlags.LockCursor;
         }
@@ -94,11 +102,11 @@ namespace BlackTundra.World.XR {
 
         #region OnControlRevoked
 
-        public ControlFlags OnControlRevoked(in ControlUser controlUser) {
+        public ControlFlags OnControlRevoked() {
             if (camera != null) {
                 camera.target = null;
             }
-            return ControlUser.ControlFlags;
+            return ControlManager.ControlFlags;
         }
 
         #endregion

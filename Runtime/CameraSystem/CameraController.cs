@@ -329,15 +329,6 @@ namespace BlackTundra.World.CameraSystem {
         }
         #endregion
 
-        #region ControlUser
-#if ENABLE_INPUT_SYSTEM
-        /// <summary>
-        /// <see cref="ControlUser"/> associated with the <see cref="CameraController"/>.
-        /// </summary>
-        public ControlUser ControlUser { get; set; } = null;
-#endif
-        #endregion
-
         #region TrackingFlags
         /// <summary>
         /// Describes how the <see cref="CameraController"/> will track the <see cref="target"/>.
@@ -508,9 +499,7 @@ namespace BlackTundra.World.CameraSystem {
                 if (sqrMagnitude > Mathf.Epsilon) { // a significant amount of shake exists
                     finalPosition += rotation * shake; // add the shake to the final camera position
                     updateTransform = true; // the transform needs updating
-                    if (ControlUser != null) { // a control user exists for the camera controller
-                        ControlUser.SetMotorRumble(Mathf.Sqrt(sqrMagnitude) * CameraShakeRumbleFrequency); // calculate the controller rumble
-                    }
+                    ControlManager.SetMotorRumble(Mathf.Sqrt(sqrMagnitude) * CameraShakeRumbleFrequency); // calculate the controller rumble
                 }
             }
             #endregion

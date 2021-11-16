@@ -149,7 +149,14 @@ namespace BlackTundra.World.XR {
         #region XRCommand
 
         [Command(
-            "xr"
+            name: "xr",
+            description: "Manages XR systems within the application.",
+            usage:
+            "xr info" +
+            "\n\tDisplays a table of XR information." +
+            "\nxr update" +
+            "\n\tForces updates all XR systems.",
+            hidden: false
         )]
         private static bool XRCommand(CommandInfo info) {
             int argumentCount = info.args.Count;

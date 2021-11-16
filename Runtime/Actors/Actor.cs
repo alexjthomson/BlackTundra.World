@@ -791,7 +791,18 @@ namespace BlackTundra.World.Actors {
         [Command(
             name: "actor",
             description: "Displays actor information.",
-            usage: ""
+            usage:
+            "actor list" +
+            "\n\tDisplays a table with information about each actor." +
+            "\nactor destroy {instanceId}" +
+            "\n\tDestroys an actor by the actors instance ID." +
+            "\nactor enable" +
+            "\n\tEnables an actor." +
+            "\nactor disable" +
+            "\n\tDisables an actor." +
+            "\nactor clone {instanceId}" +
+            "\n\tClones an actor by the actors instance ID.",
+            hidden: false
         )]
         private static bool ActorCommand(CommandInfo info) {
             int argumentCount = info.args.Count;
@@ -916,7 +927,8 @@ namespace BlackTundra.World.Actors {
                                     actor = ActorBuffer[i];
                                     if (instanceId == actor.GetInstanceID()) {
                                         info.context.Print($"Cloning actor \"{instanceId.ToHex()}\".");
-                                        Instantiate(actor, actor.transform.position, actor.transform.rotation, actor.transform.parent);
+                                        Actor clone = Instantiate(actor, actor.transform.position, actor.transform.rotation, actor.transform.parent);
+                                        clone.gameObject.name = string.Concat(actor.name, "_Clone_", actor.GetInstanceID().ToHex());
                                         return true;
                                     }
                                 }
