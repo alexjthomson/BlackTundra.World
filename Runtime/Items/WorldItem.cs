@@ -14,6 +14,12 @@ namespace BlackTundra.World.Items {
 
         #region variable
 
+        /// <summary>
+        /// <see cref="ItemDescriptor"/> that describes this <see cref="WorldItem"/>.
+        /// </summary>
+        [SerializeField]
+        private ItemDescriptor itemDescriptor = null;
+
         #region primary use
 
         /// <summary>
@@ -82,6 +88,11 @@ namespace BlackTundra.World.Items {
         internal Vector3 holdRotationOffset = Vector3.zero;
 
         /// <summary>
+        /// <see cref="IItemHolder"/> that is currently holding the <see cref="WorldItem"/>.
+        /// </summary>
+        private IItemHolder holder = null;
+
+        /// <summary>
         /// <see cref="Item"/> associated with the <see cref="WorldItem"/>.
         /// </summary>
         private Item item = null;
@@ -100,6 +111,19 @@ namespace BlackTundra.World.Items {
         public Rigidbody rigidbody { get; private set; } = null;
 #pragma warning restore IDE1006 // naming styles
 
+        /// <summary>
+        /// <see cref="IItemHolder"/> instance currently holding this <see cref="WorldItem"/>.
+        /// </summary>
+        public IItemHolder ItemHolder => holder;
+
+        public Item Item {
+            get => item;
+        }
+
+        public Vector3 LocalHoldPosition => holdPositionOffset;
+
+        public Vector3 LocalHoldRotation => holdRotationOffset;
+
         #endregion
 
         #region constructor
@@ -112,6 +136,10 @@ namespace BlackTundra.World.Items {
 
         private void Awake() {
             rigidbody = GetComponent<Rigidbody>();
+            if (item == null) {
+                ItemData itemData = ItemData.GetItem(itemDescriptor.name);
+                if (itemData != null) item = new Item(itemData.id);
+            }
         }
 
         #endregion
@@ -197,20 +225,50 @@ namespace BlackTundra.World.Items {
 
         #endregion
 
-        #region ItemHeld
+        #region PickupItem
 
-        public void ItemPickedUp() {
+        public void PickupItem(in IItemHolder holder) {
+            if (this.holder != null) {
+                ReleaseItem(this.holder);
+            }
+            if (holder != null) {
+                this.holder = holder;
+                this.holder.OnHoldItem(this);
+            }
             onItemPickup?.Invoke();
         }
 
         #endregion
 
-        #region ItemDropped
+        #region XRPickupItem
+#if ENABLE_VR
+        public void XRPickupItem() {
+            throw new System.NotImplementedException();
+        }
+#endif
+        #endregion
 
-        public void ItemDropped() {
+        #region ReleaseItem
+
+        public void ReleaseItem(in IItemHolder holder) {
+            if (this.holder == holder) {
+                try {
+                    this.holder.OnReleaseItem(this);
+                } finally {
+                    this.holder = null;
+                }
+            }
             onItemDrop.Invoke();
         }
 
+        #endregion
+
+        #region XRReleaseItem
+#if ENABLE_VR
+        public void XRReleaseItem() {
+            throw new System.NotImplementedException();
+        }
+#endif
         #endregion
 
         #endregion

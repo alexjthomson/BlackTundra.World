@@ -34,6 +34,11 @@ namespace BlackTundra.World.Items {
         /// </summary>
         public int height => ItemData.GetItem(id).height;
 
+        /// <summary>
+        /// Tracks if the <see cref="Item"/> is rotated by 90 degrees or not.
+        /// </summary>
+        public bool rotated { get; internal set; } = false;
+
         #endregion
 
         #region constructor

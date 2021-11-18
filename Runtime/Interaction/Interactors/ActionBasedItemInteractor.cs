@@ -1,5 +1,7 @@
 using BlackTundra.World.Items;
 
+using System;
+
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -12,7 +14,7 @@ namespace BlackTundra.World.Interaction.Interactors {
     [AddComponentMenu("Interaction/Item Interactor")]
 #endif
     [DisallowMultipleComponent]
-    public sealed class ActionBasedItemInteractor : MonoBehaviour {
+    public sealed class ActionBasedItemInteractor : MonoBehaviour, IItemHolder {
 
         #region variable
 
@@ -92,6 +94,17 @@ namespace BlackTundra.World.Interaction.Interactors {
         /// </summary>
         private Quaternion itemRotationOffset = Quaternion.identity;
 
+        private InputAction _pickupAction = null;
+        private InputAction _throwAction = null;
+        private InputAction _primaryUseAction = null;
+        private InputAction _secondaryUseAction = null;
+        private InputAction _tertiaryUseAction = null;
+
+        /// <summary>
+        /// Tracks the last <see cref="WorldItem"/> that was hit with an interaction ray.
+        /// </summary>
+        private WorldItem lastHit = null;
+
         #endregion
 
         #region logic
@@ -100,6 +113,11 @@ namespace BlackTundra.World.Interaction.Interactors {
 
         private void OnEnable() {
             if (itemTarget == null) itemTarget = transform;
+            _pickupAction = pickupAction.action;
+            _throwAction = throwAction.action;
+            _primaryUseAction = primaryUseAction.action;
+            _secondaryUseAction = secondaryUseAction.action;
+            _tertiaryUseAction = tertiaryUseAction.action;
         }
 
         #endregion
@@ -108,53 +126,69 @@ namespace BlackTundra.World.Interaction.Interactors {
 
         private void Update() {
             if (item != null) { // there is currently an item being held
-                InputAction action = throwAction.action;
-                if (action != null) {
-                    float inputThrow = action.ReadValue<float>();
-                    if (inputThrow > 0.5f) { // throw above threshold value
-                        try {
-                            item.ItemDropped();
-                        } finally {
-                            item = null;
-                            itemRigidbody.isKinematic = false;
-                            itemRigidbody.AddForce(transform.rotation * new Vector3(0.0f, 0.0f, itemThrowForce), ForceMode.Impulse);
-                            itemRigidbody = null;
-                        }
-                        return;
-                    }
+                if (lastHit != null) {
+                    if (lastHit != item) ResetLastHit();
+                    lastHit = null;
                 }
-                action = primaryUseAction.action;
-                item.SetPrimaryUseState(action != null && action.ReadValue<float>() > 0.5f);
-                action = secondaryUseAction.action;
-                item.SetSecondaryUseState(action != null && action.ReadValue<float>() > 0.5f);
-                action = tertiaryUseAction.action;
-                item.SetTertiaryUseState(action != null && action.ReadValue<float>() > 0.5f);
+                if (InputThrow()) { // throw above threshold value
+                    item.ReleaseItem(this);
+                    return;
+                } else { // item not thrown
+                    item.SetPrimaryUseState(InputPrimaryUse());
+                    item.SetSecondaryUseState(InputSecondaryUse());
+                    item.SetTertiaryUseState(InputTertiaryUse());
+                }
             } else { // there is not currently an item being held
-                if (Physics.Raycast(transform.position, transform.forward, out RaycastHit hit, range, layerMask, QueryTriggerInteraction.Ignore)) { // cast pickup ray
-                    WorldItem currentWorldItem = hit.collider.GetComponent<WorldItem>();
-                    if (currentWorldItem != null) { // a world item was hit
-                        InputAction action = pickupAction.action;
-                        if (action != null) {
-                            float inputPickup = action.ReadValue<float>();
-                            if (inputPickup > 0.5f) { // pickup input activated
-                                item = currentWorldItem;
-                                itemPositionOffset = item.holdPositionOffset;
-                                itemRotationOffset = Quaternion.Euler(item.holdRotationOffset);
-                                itemRigidbody = item.rigidbody;
-                                itemRigidbody.isKinematic = true;
-                                itemRigidbody.velocity = Vector3.zero;
-                                itemRigidbody.angularVelocity = Vector3.zero;
-                                itemRigidbody.position = itemTarget.position;
-                                itemRigidbody.rotation = CalculateItemRotation();
-                                item.ItemPickedUp(); // trigger item picked up events
-                            }
-                        }
+                if (CastInteractionRay(out WorldItem item)) {
+                    if (item != lastHit) {
+                        if (lastHit != null) ResetLastHit();
+                        lastHit = item;
+                    }
+                    if (InputPickUp()) item.PickupItem(this);
+                    else {
+                        item.SetPrimaryUseState(InputPrimaryUse());
+                        item.SetSecondaryUseState(InputSecondaryUse());
+                        item.SetTertiaryUseState(InputTertiaryUse());
                     }
                 }
             }
         }
 
         #endregion
+
+        #region ResetLastHit
+
+        private void ResetLastHit() {
+            lastHit.SetPrimaryUseState(false);
+            lastHit.SetSecondaryUseState(false);
+            lastHit.SetTertiaryUseState(false);
+        }
+
+        #endregion
+
+        #region CastInteractionRay
+
+        /// <summary>
+        /// Casts an interaction ray.
+        /// </summary>
+        private bool CastInteractionRay(out WorldItem item) {
+            if (Physics.Raycast(transform.position, transform.forward, out RaycastHit hit, range, layerMask, QueryTriggerInteraction.Ignore)) { // cast pickup ray
+                item = hit.collider.GetComponent<WorldItem>();
+                return item != null && item.ItemHolder == null;
+            } else {
+                item = null;
+                lastHit = null;
+                return false;
+            }
+        }
+
+        #endregion
+
+        private bool InputPickUp() => _pickupAction.ReadValue<float>() > 0.5f;
+        private bool InputThrow() => _throwAction.ReadValue<float>() > 0.5f;
+        private bool InputPrimaryUse() => _primaryUseAction.ReadValue<float>() > 0.5f;
+        private bool InputSecondaryUse() => _secondaryUseAction.ReadValue<float>() > 0.5f;
+        private bool InputTertiaryUse() => _tertiaryUseAction.ReadValue<float>() > 0.5f;
 
         #region FixedUpdate
 
@@ -188,6 +222,44 @@ namespace BlackTundra.World.Interaction.Interactors {
         #region CalculateItemRotation
 
         private Quaternion CalculateItemRotation() => itemTarget.rotation * itemRotationOffset;
+
+        #endregion
+
+        #region IsHoldingItem
+
+        public bool IsHoldingItem() => item != null;
+
+        public bool IsHoldingItem(in WorldItem item) => item != null && this.item == item;
+
+        #endregion
+
+        #region OnHoldItem
+
+        public void OnHoldItem(in WorldItem item) {
+            if (item == null) throw new ArgumentNullException(nameof(item));
+            this.item = item;
+            itemPositionOffset = item.holdPositionOffset;
+            itemRotationOffset = Quaternion.Euler(item.holdRotationOffset);
+            itemRigidbody = item.rigidbody;
+            itemRigidbody.isKinematic = true;
+            itemRigidbody.velocity = Vector3.zero;
+            itemRigidbody.angularVelocity = Vector3.zero;
+            itemRigidbody.position = itemTarget.position;
+            itemRigidbody.rotation = CalculateItemRotation();
+        }
+
+        #endregion
+
+        #region OnReleaseItem
+
+        public void OnReleaseItem(in WorldItem item) {
+            if (item == null) throw new ArgumentNullException(nameof(item));
+            if (item != this.item) return;
+            this.item = null;
+            itemRigidbody.isKinematic = false;
+            itemRigidbody.AddForce(transform.rotation * new Vector3(0.0f, 0.0f, itemThrowForce), ForceMode.Impulse);
+            itemRigidbody = null;
+        }
 
         #endregion
 

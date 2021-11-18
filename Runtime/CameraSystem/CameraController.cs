@@ -339,6 +339,24 @@ namespace BlackTundra.World.CameraSystem {
         }
         #endregion
 
+        #region MainCameraPosition
+
+        /// <summary>
+        /// Position in world-space of the main camera.
+        /// </summary>
+        public static Vector3 MainCameraPosition {
+            get {
+                if (current != null) return current.position;
+                else {
+                    Camera mainCamera = Camera.main;
+                    if (mainCamera != null) return mainCamera.transform.position;
+                    else return Vector3.zero;
+                }
+            }
+        }
+
+        #endregion
+
         #region IsCurrent
         /// <summary>
         /// Returns <c>true</c> if this <see cref="CameraController"/> is the <see cref="current"/> <see cref="CameraController"/>.

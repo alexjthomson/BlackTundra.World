@@ -130,64 +130,13 @@ namespace BlackTundra.World.Items {
         /// <param name="y">Start y position.</param>
         /// <param name="width">Width of the area to set.</param>
         /// <param name="height">Height of the area to set.</param>
-        /// <param name="value">Value to set the area to.</param>
-        private void SetArea(in int x, in int y, in int width, in int height, in int value) {
+        /// <param name="index">Value to set the area to.</param>
+        private void SetArea(in int x, in int y, in int width, in int height, in int index) {
             for (int px = x + width - 1; px >= x; px--) { // iterate width
-                for (int py = y + height - 1; py >= x; py--) { // iterate height
-                    grid[x, y] = value; // set value
+                for (int py = y + height - 1; py >= y; py--) { // iterate height
+                    grid[px, py] = index; // set value
                 }
             }
-        }
-
-        #endregion
-
-        #region TryLocateArea
-
-        /// <summary>
-        /// Locates an area of a specified <see cref="width"/> and <see cref="height"/>.
-        /// </summary>
-        /// <param name="width">Width of the area to find.</param>
-        /// <param name="height">Height of the area to find.</param>
-        /// <param name="x">x coordinate of the found area.</param>
-        /// <param name="y">y coordinate of the found area.</param>
-        /// <returns>Returns <c>true</c> if an area was located; otherwise <c>false</c> is returned.</returns>
-        public bool TryLocateArea(in int width, in int height, out int x, out int y) {
-            if (width < 1 || width > this.width) throw new ArgumentOutOfRangeException(nameof(width));
-            if (height < 1 || height > this.height) throw new ArgumentOutOfRangeException(nameof(height));
-            for (int py = 0; py < this.height; py++) { // iterate each row one at a time
-                for (int px = 0; px < this.width; px++) { // iterate each column in order
-                    if (grid[px, py] == -1) { // top right cell is free, start searching for space
-                        bool empty = true; // store if the current search has an empty area.
-                        if (height > 1) { // height is more than 1
-                            for (int spy = py + 1; spy < py + height; spy++) { // check left side is empty
-                                if (grid[px, spy] != -1) { // not empty
-                                    empty = false;
-                                    break;
-                                }
-                            }
-                            if (!empty) continue; // this area is not empty
-                        }
-                        if (width > 1) { // width is more than 1
-                            int yLimit = py + height;
-                            for (int spx = px + 1; spx < px + width; spx++) { // iterate each remaining column
-                                for (int spy = py; spy < yLimit; spy++) { // iterate each row in the current column
-                                    if (grid[spx, spy] != -1) { // not empty
-                                        empty = false;
-                                        break;
-                                    }
-                                }
-                                if (!empty) break;
-                            }
-                        }
-                        if (empty) { // all checks passed, an empty area has been found
-                            x = px; y = py; // assign x and y positions
-                            return true; // successfully stop here
-                        }
-                    }
-                }
-            }
-            x = -1; y = -1; // assign x and y positions to -1
-            return false; // return false since no area was found
         }
 
         #endregion
@@ -268,6 +217,45 @@ namespace BlackTundra.World.Items {
 
         #endregion
 
+        #region TryLocateArea
+
+        /// <summary>
+        /// Locates an area of a specified <see cref="width"/> and <see cref="height"/>.
+        /// </summary>
+        /// <param name="width">Width of the area to find.</param>
+        /// <param name="height">Height of the area to find.</param>
+        /// <param name="x">x coordinate of the found area.</param>
+        /// <param name="y">y coordinate of the found area.</param>
+        /// <returns>Returns <c>true</c> if an area was located; otherwise <c>false</c> is returned.</returns>
+        public bool TryLocateArea(in int width, in int height, out int x, out int y) {
+            if (width < 1 || width > this.width) throw new ArgumentOutOfRangeException(nameof(width));
+            if (height < 1 || height > this.height) throw new ArgumentOutOfRangeException(nameof(height));
+            int maxX = this.width - width + 1;
+            int maxY = this.height - height + 1;
+            for (int py = 0; py < maxY; py++) { // iterate each row one at a time
+                for (int px = 0; px < maxX; px++) { // iterate each column in order
+                    bool empty = true;
+                    for (int spy = py; spy < py + height; spy++) {
+                        for (int spx = px; spx < px + width; spx++) {
+                            if (grid[spx, spy] != -1) {
+                                empty = false;
+                                break;
+                            }
+                        }
+                        if (!empty) break;
+                    }
+                    if (empty) {
+                        x = px; y = py;
+                        return true;
+                    }
+                }
+            }
+            x = -1; y = -1; // assign x and y positions to -1
+            return false; // return false since no area was found
+        }
+
+        #endregion
+
         #region IndexOf
 
         /// <returns>
@@ -297,12 +285,18 @@ namespace BlackTundra.World.Items {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (width < 1 || width > this.width) throw new ArgumentOutOfRangeException(nameof(width));
             if (height < 1 || height > this.height) throw new ArgumentOutOfRangeException(nameof(height));
-            if (x < 0 || x > this.width - width) throw new ArgumentOutOfRangeException(nameof(x));
-            if (y < 0 || y > this.height - height) throw new ArgumentOutOfRangeException(nameof(y));
+            if (rotated) {
+                if (x < 0 || x > this.width - height) throw new ArgumentOutOfRangeException(nameof(x));
+                if (y < 0 || y > this.height - width) throw new ArgumentOutOfRangeException(nameof(y));
+            } else {
+                if (x < 0 || x > this.width - width) throw new ArgumentOutOfRangeException(nameof(x));
+                if (y < 0 || y > this.height - height) throw new ArgumentOutOfRangeException(nameof(y));
+            }
             int injectIndex = ItemCount; // get the index to inject the item at
             if (injectIndex >= area) return false; // maximum number of items reached
             itemBuffer[injectIndex] = item; // insert into item buffer
             if (rotated) SetArea(x, y, height, width, injectIndex); else SetArea(x, y, width, height, injectIndex); // set item area
+            item.rotated = rotated;
             return true;
         }
 
@@ -319,7 +313,11 @@ namespace BlackTundra.World.Items {
                 }
                 rotated = true; // set rotated flag to true
             }
-            return TryInjectItemAt(item, px, py, width, height, rotated);
+            if (TryInjectItemAt(item, px, py, width, height, rotated)) {
+                item.rotated = rotated;
+                return true;
+            }
+            return false;
         }
 
         #endregion
@@ -337,7 +335,11 @@ namespace BlackTundra.World.Items {
                 }
                 rotated = true;
             }
-            return TryInjectItemAt(item, x, y, width, height, rotated);
+            if (TryInjectItemAt(item, x, y, width, height, rotated)) {
+                item.rotated = rotated;
+                return true;
+            }
+            return false;
         }
 
         #endregion

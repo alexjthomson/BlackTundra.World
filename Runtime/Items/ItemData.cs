@@ -168,6 +168,17 @@ namespace BlackTundra.World.Items {
             return items[id];
         }
 
+        public static ItemData GetItem(in string name) {
+            if (name == null) throw new ArgumentNullException(nameof(name));
+            ItemData item;
+            for (int i = items.Length - 1; i >= 0; i--) {
+                item = items[i];
+                if (name.Equals(item.name)) return item;
+            }
+            //throw new KeyNotFoundException(name);
+            return null;
+        }
+
         #endregion
 
     }

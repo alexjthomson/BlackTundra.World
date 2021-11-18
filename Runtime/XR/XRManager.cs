@@ -24,17 +24,7 @@ namespace BlackTundra.World.XR {
 
         #region constant
 
-        /// <summary>
-        /// <see cref="FileSystemReference"/> to where <see cref="configuration"/> is stored on the system.
-        /// </summary>
-        private static readonly FileSystemReference ConfigurationFSR = new FileSystemReference(
-            FileSystem.LocalConfigDirectory + "xr.config",
-            true,
-            false
-        );
-
-        internal const string XRConfKey_Enabled = "xr.startup.enabled";
-        internal const string XRConfKey_TurnSpeed = "xr.locomotion.turn_speed";
+        public const string XRConfigName = "xr";
 
 #if UNITY_EDITOR
         private const string XRDeviceSimulatorResourcePath = "XR/XRDeviceSimulator";
@@ -56,11 +46,6 @@ namespace BlackTundra.World.XR {
         private static GameObject deviceSimulator = null;
 #endif
 
-        /// <summary>
-        /// <see cref="Configuration"/> for XR.
-        /// </summary>
-        internal static Configuration configuration = null;
-
         #endregion
 
         #region property
@@ -69,6 +54,7 @@ namespace BlackTundra.World.XR {
         public static bool IsActive => XRSettings.isDeviceActive;
 
         /// <inheritdoc cref="XRSettings.enabled"/>
+        [ConfigurationEntry(XRConfigName, "xr.enabled", true)]
         public static bool IsEnabled {
             get => XRGeneralSettings.Instance.Manager.isInitializationComplete;
             set {
@@ -83,23 +69,9 @@ namespace BlackTundra.World.XR {
 
         #region Initialise
 
-        [CoreInitialise(int.MinValue)]
+        [CoreInitialise(int.MinValue + 1)]
         private static void Initialise() {
-            UpdateConfiguration();
-            IsEnabled = configuration.GetBool(XRConfKey_Enabled);
             UpdateState();
-        }
-
-        #endregion
-
-        #region UpdateConfiguration
-
-        private static void UpdateConfiguration() {
-            if (configuration == null) configuration = new Configuration();
-            configuration = FileSystem.LoadConfiguration(ConfigurationFSR, configuration);
-            configuration.ForceGet(XRConfKey_Enabled, false);
-            configuration.ForceGet(XRConfKey_TurnSpeed, 120.0f);
-            if (configuration.IsDirty) FileSystem.UpdateConfiguration(ConfigurationFSR, configuration);
         }
 
         #endregion
@@ -161,17 +133,17 @@ namespace BlackTundra.World.XR {
         private static bool XRCommand(CommandInfo info) {
             int argumentCount = info.args.Count;
             if (argumentCount == 0) {
-                info.context.Print("Expected arguments.");
+                ConsoleWindow.Print("Expected arguments.");
                 return false;
             }
             string arg = info.args[0].ToLower();
             switch (arg) {
                 case "info": { // display vr information
                     if (argumentCount > 1) {
-                        info.context.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
+                        ConsoleWindow.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
                         return false;
                     }
-                    info.context.PrintTable(
+                    ConsoleWindow.PrintTable(
                         new string[,] {
                             { "<b>XR Device</b>", string.Empty },
                             { $"<color=#{Colour.Gray.hex}>Device Active</color>", XRSettings.isDeviceActive ? "true" : "false" },
@@ -197,14 +169,14 @@ namespace BlackTundra.World.XR {
                 }
                 case "update": {
                     if (argumentCount > 1) {
-                        info.context.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
+                        ConsoleWindow.Print(ConsoleUtility.UnknownArgumentMessage(info.args, 1));
                         return false;
                     }
                     UpdateState();
                     return true;
                 }
                 default: {
-                    info.context.Print(ConsoleUtility.UnknownArgumentMessage(info.args));
+                    ConsoleWindow.Print(ConsoleUtility.UnknownArgumentMessage(info.args));
                     return false;
                 }
             }

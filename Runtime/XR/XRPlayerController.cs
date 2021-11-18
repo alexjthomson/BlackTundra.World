@@ -2,6 +2,7 @@
 
 using BlackTundra.Foundation;
 using BlackTundra.Foundation.Control;
+using BlackTundra.Foundation.IO;
 using BlackTundra.World.CameraSystem;
 
 using UnityEngine;
@@ -47,6 +48,13 @@ namespace BlackTundra.World.XR {
 
         #endregion
 
+        #region property
+
+        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.turn_speed", 120.0f)]
+        public static int TurnSpeed { get; set; }
+
+        #endregion
+
         #region logic
 
         #region Awake
@@ -56,7 +64,7 @@ namespace BlackTundra.World.XR {
             controller = GetComponent<CharacterController>();
             driver = GetComponent<CharacterControllerDriver>();
             Transform locomotion = transform.Find("LocomotionSystem");
-            locomotion.GetComponent<ActionBasedContinuousTurnProvider>().turnSpeed = XRManager.configuration.GetFloat(XRManager.XRConfKey_TurnSpeed);
+            locomotion.GetComponent<ActionBasedContinuousTurnProvider>().turnSpeed = TurnSpeed;
         }
 
         #endregion
@@ -102,11 +110,10 @@ namespace BlackTundra.World.XR {
 
         #region OnControlRevoked
 
-        public ControlFlags OnControlRevoked() {
+        public void OnControlRevoked() {
             if (camera != null) {
                 camera.target = null;
             }
-            return ControlManager.ControlFlags;
         }
 
         #endregion
