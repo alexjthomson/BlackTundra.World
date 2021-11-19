@@ -2,6 +2,7 @@ using BlackTundra.World.Interaction;
 
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.XR.Interaction.Toolkit;
 
 namespace BlackTundra.World.Items {
 
@@ -10,6 +11,9 @@ namespace BlackTundra.World.Items {
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Rigidbody))]
+#if ENABLE_VR
+    [RequireComponent(typeof(XRGrabInteractable))]
+#endif
     public sealed class WorldItem : MonoBehaviour {
 
         #region variable
@@ -97,6 +101,13 @@ namespace BlackTundra.World.Items {
         /// </summary>
         private Item item = null;
 
+#if ENABLE_VR
+        /// <summary>
+        /// <see cref="XRGrabInteractable"/> used to allow XR to interact with the <see cref="WorldItem"/>.
+        /// </summary>
+        private XRGrabInteractable xrGrabInteractable = null;
+#endif
+
         #endregion
 
         #region property
@@ -136,6 +147,9 @@ namespace BlackTundra.World.Items {
 
         private void Awake() {
             rigidbody = GetComponent<Rigidbody>();
+#if ENABLE_VR
+            xrGrabInteractable = GetComponent<XRGrabInteractable>();
+#endif
             if (item == null) {
                 ItemData itemData = ItemData.GetItem(itemDescriptor.name);
                 if (itemData != null) item = new Item(itemData.id);
@@ -243,7 +257,13 @@ namespace BlackTundra.World.Items {
         #region XRPickupItem
 #if ENABLE_VR
         public void XRPickupItem() {
-            throw new System.NotImplementedException();
+            XRBaseInteractor interactor = xrGrabInteractable.selectingInteractor;
+            if (interactor != null) {
+                IItemHolder itemHolder = interactor.GetComponent<IItemHolder>();
+                if (itemHolder != null) {
+                    PickupItem(itemHolder);
+                }
+            }
         }
 #endif
         #endregion
@@ -266,7 +286,15 @@ namespace BlackTundra.World.Items {
         #region XRReleaseItem
 #if ENABLE_VR
         public void XRReleaseItem() {
-            throw new System.NotImplementedException();
+            if (holder != null) {
+                Behaviour holderBehaviour = holder as Behaviour;
+                if (holderBehaviour != null) {
+                    XRBaseController controller = holderBehaviour.GetComponent<XRBaseController>();
+                    if (controller != null) {
+                        ReleaseItem(holder);
+                    }
+                }
+            }
         }
 #endif
         #endregion

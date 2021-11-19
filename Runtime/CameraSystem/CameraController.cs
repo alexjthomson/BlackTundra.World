@@ -13,7 +13,7 @@ namespace BlackTundra.World.CameraSystem {
     /// enhancing features such as camera shake and camera zoom.
     /// </summary>
 #if UNITY_EDITOR
-    [AddComponentMenu("World/Camera Controller")]
+    [AddComponentMenu("World/Camera/Camera Controller")]
 #endif
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Camera))]
@@ -114,6 +114,11 @@ namespace BlackTundra.World.CameraSystem {
         /// </summary>
         private static int rollingCameraId = 0;
 
+        /// <summary>
+        /// Reference to the original <see cref="Transform"/> that the <see cref="CameraController"/> was a child of.
+        /// </summary>
+        private Transform originalParent = null;
+
         #endregion
 
         #region property
@@ -129,6 +134,11 @@ namespace BlackTundra.World.CameraSystem {
             set {
                 if (value == _target || value == transform) return;
                 _target = value;
+                if ((trackingFlags | CameraTrackingFlags.Parent) != 0) {
+                    transform.parent = _target;
+                } else {
+                    transform.parent = originalParent;
+                }
             }
         }
         #endregion
@@ -335,7 +345,14 @@ namespace BlackTundra.World.CameraSystem {
         /// </summary>
         public CameraTrackingFlags TrackingFlags {
             get => trackingFlags;
-            set => trackingFlags = value;
+            set {
+                trackingFlags = value;
+                if (target != null && (trackingFlags | CameraTrackingFlags.Parent) != 0) {
+                    transform.parent = target;
+                } else {
+                    transform.parent = originalParent;
+                }
+            }
         }
         #endregion
 
@@ -388,6 +405,7 @@ namespace BlackTundra.World.CameraSystem {
         #region Awake
 
         private void Awake() {
+            originalParent = transform.parent;
 
             #region setup camera
             camera = this.ForceGetComponent<Camera>();
@@ -457,77 +475,84 @@ namespace BlackTundra.World.CameraSystem {
 
         private void LateUpdate() {
             float deltaTime = Time.deltaTime;
-            #region update position & shake
-            bool updateTransform = false; // track if the transform position/rotation needs to be updated
-            #region tracking
-            if (target != null) {
-                #region update position
-                if (positionTrackingSpeed > 0.0f) { // has position tracking speed
-                    Vector3 lastPosition = _position;
-                    #region smooth / unsmooth tracking
-                    if ((trackingFlags & CameraTrackingFlags.Smooth) != 0) {
-                        _position = Vector3.Lerp(
-                            _position,
-                            target.position + (target.forward * midTrackingDistance),
-                            positionTrackingSpeed * deltaTime
-                        );
-                    } else {
-                        _position = target.position + (target.forward * midTrackingDistance);
+            if (target != null && (trackingFlags | CameraTrackingFlags.Parent) != 0) { // parented to target
+                Vector3 localPosition = Vector3.zero;
+                if (CameraShakeSource.HasSample()) { // a sample can be taken for camera shake
+                    Vector3 shake = CameraShakeSource.Sample(transform.position); // sample camera shake
+                    float sqrMagnitude = shake.sqrMagnitude; // calculate the square magnitude of the camera shake
+                    if (sqrMagnitude > Mathf.Epsilon) { // a significant amount of shake exists
+                        localPosition = shake; // add the shake to the final camera position
+                        ControlManager.SetMotorRumble(Mathf.Sqrt(sqrMagnitude) * CameraShakeRumbleFrequency); // calculate the controller rumble
                     }
-                    #endregion
-                    #region clamping
-                    if ((trackingFlags & (CameraTrackingFlags.MinClamp | CameraTrackingFlags.MaxClamp)) != 0) { // positional clamping is enabled
-                        Vector3 localPosition = position - target.position; // calculate the local position of the camera relative to the target position
-                        float sqrDistanceToTarget = localPosition.sqrMagnitude;
-                        if ((trackingFlags & CameraTrackingFlags.MinClamp) != 0 && sqrDistanceToTarget < (minTrackingDistance * minTrackingDistance)) {
-                            _position = target.position + (target.forward * minTrackingDistance);
-                        } else if ((trackingFlags & CameraTrackingFlags.MaxClamp) != 0 && sqrDistanceToTarget > (maxTrackingDistance * maxTrackingDistance)) {
-                            _position = target.position + (target.forward * maxTrackingDistance);
+                }
+                transform.localPosition = localPosition;
+            } else { // parented to original target
+                bool updateTransform = false; // track if the transform position/rotation needs to be updated
+                if (target != null) { // there is a target to track
+                    if (positionTrackingSpeed > 0.0f) { // has position tracking speed
+                        Vector3 lastPosition = _position;
+                        // apply smoothing:
+                        if ((trackingFlags & CameraTrackingFlags.Smooth) != 0) {
+                            _position = Vector3.Lerp(
+                                _position,
+                                target.position + (target.forward * midTrackingDistance),
+                                positionTrackingSpeed * deltaTime
+                            );
+                        } else {
+                            _position = target.position + (target.forward * midTrackingDistance);
+                        }
+
+                        // apply clamping:
+                        if ((trackingFlags & (CameraTrackingFlags.MinClamp | CameraTrackingFlags.MaxClamp)) != 0) { // positional clamping is enabled
+                            Vector3 localPosition = _position - target.position; // calculate the local position of the camera relative to the target position
+                            float sqrDistanceToTarget = localPosition.sqrMagnitude;
+                            if ((trackingFlags & CameraTrackingFlags.MinClamp) != 0 && sqrDistanceToTarget < (minTrackingDistance * minTrackingDistance)) {
+                                _position = target.position + (target.forward * minTrackingDistance);
+                            } else if ((trackingFlags & CameraTrackingFlags.MaxClamp) != 0 && sqrDistanceToTarget > (maxTrackingDistance * maxTrackingDistance)) {
+                                _position = target.position + (target.forward * maxTrackingDistance);
+                            }
+                        }
+                        velocity = (lastPosition - _position) * (1.0f / deltaTime);
+                    } else {
+                        velocity = Vector3.zero;
+                    }
+                    if (rotationTrackingSpeed > 0.0f) { // has tracking speed
+                        if ((trackingFlags & CameraTrackingFlags.Smooth) != 0) {
+                            _rotation = Quaternion.Lerp(
+                                _rotation,
+                                target.rotation,
+                                rotationTrackingSpeed * deltaTime
+                            );
+                        } else {
+                            _rotation = target.rotation;
                         }
                     }
-                    #endregion
-                    velocity = (lastPosition - position) * (1.0f / deltaTime);
+                    updateTransform = true;
                 } else {
                     velocity = Vector3.zero;
                 }
-                #endregion
-                #region update rotation
-                if (rotationTrackingSpeed > 0.0f) { // has tracking speed
-                    if ((trackingFlags & CameraTrackingFlags.Smooth) != 0) {
-                        _rotation = Quaternion.Lerp(
-                            _rotation,
-                            target.rotation,
-                            rotationTrackingSpeed * deltaTime
-                        );
-                    } else {
-                        _rotation = target.rotation;
+
+                Vector3 finalPosition = _position;
+
+                if (CameraShakeSource.HasSample()) { // a sample can be taken for camera shake
+                    Vector3 shake = CameraShakeSource.Sample(transform.position); // sample camera shake
+                    float sqrMagnitude = shake.sqrMagnitude; // calculate the square magnitude of the camera shake
+                    if (sqrMagnitude > Mathf.Epsilon) { // a significant amount of shake exists
+                        finalPosition += _rotation * shake; // add the shake to the final camera position
+                        updateTransform = true; // the transform needs updating
+                        ControlManager.SetMotorRumble(Mathf.Sqrt(sqrMagnitude) * CameraShakeRumbleFrequency); // calculate the controller rumble
                     }
                 }
-                #endregion
-                updateTransform = true;
-            } else {
-                velocity = Vector3.zero;
-            }
-            #endregion
-            Vector3 finalPosition = position;
-            #region camera shake
-            if (CameraShakeSource.HasSample()) { // a sample can be taken for camera shake
-                Vector3 shake = CameraShakeSource.Sample(transform.position); // sample camera shake
-                float sqrMagnitude = shake.sqrMagnitude; // calculate the square magnitude of the camera shake
-                if (sqrMagnitude > Mathf.Epsilon) { // a significant amount of shake exists
-                    finalPosition += rotation * shake; // add the shake to the final camera position
-                    updateTransform = true; // the transform needs updating
-                    ControlManager.SetMotorRumble(Mathf.Sqrt(sqrMagnitude) * CameraShakeRumbleFrequency); // calculate the controller rumble
+
+                if (updateTransform) {
+                    transform.SetPositionAndRotation(
+                        finalPosition,
+                        _rotation
+                    );
                 }
+
             }
-            #endregion
-            if (updateTransform) {
-                transform.SetPositionAndRotation(
-                    finalPosition,
-                    rotation
-                );
-            }
-            #endregion
+
             #region wind (audio)
             if (audioSource.clip != null) { // there is an audio clip (for wind audio)
                 Vector3 relativeWindVelocity = -velocity; // when still, air is acting against the velocity of the camera controller

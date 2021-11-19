@@ -26,15 +26,6 @@ namespace BlackTundra.World.XR {
 
         public const string XRConfigName = "xr";
 
-#if UNITY_EDITOR
-        private const string XRDeviceSimulatorResourcePath = "XR/XRDeviceSimulator";
-        private static readonly ResourceReference<GameObject> XRDeviceSimulator = new ResourceReference<GameObject>(XRDeviceSimulatorResourcePath);
-        private static readonly string[] MockHMDAliases = new string[] {
-            "MockHMD Display",
-            "Mock HMD"
-        };
-#endif
-
         #endregion
 
         #region variable
@@ -53,15 +44,37 @@ namespace BlackTundra.World.XR {
         /// <inheritdoc cref="XRSettings.isDeviceActive"/>
         public static bool IsActive => XRSettings.isDeviceActive;
 
+        /// <summary>
+        /// Returns <c>true</c> when the application is ready to start using XR.
+        /// </summary>
+        public static bool IsReady => isEnabled && HasDevice;
+
+        /// <summary>
+        /// Returns <c>true</c> if an XR device has been registered with the XR system.
+        /// </summary>
+        public static bool HasDevice {
+            get {
+                string loadedDeviceName = XRSettings.loadedDeviceName;
+                return loadedDeviceName != null && loadedDeviceName.Length > 0;
+            }
+        }
+
         /// <inheritdoc cref="XRSettings.enabled"/>
         [ConfigurationEntry(XRConfigName, "xr.enabled", true)]
         public static bool IsEnabled {
-            get => XRGeneralSettings.Instance.Manager.isInitializationComplete;
+            get => isEnabled;
             set {
-                if (value) XRGeneralSettings.Instance.Manager.InitializeLoader();
-                else XRGeneralSettings.Instance.Manager.DeinitializeLoader();
+                isEnabled = value;
+                if (isEnabled) {
+                    Console.Info($"[{nameof(XRManager)}] XR enabled.");
+                    XRGeneralSettings.Instance.Manager.InitializeLoader();
+                } else {
+                    Console.Info($"[{nameof(XRManager)}] XR disabled.");
+                    XRGeneralSettings.Instance.Manager.DeinitializeLoader();
+                }
             }
         }
+        private static bool isEnabled = false;
 
         #endregion
 
@@ -78,42 +91,10 @@ namespace BlackTundra.World.XR {
 
         #region UpdateState
 
-        /// <summary>
-        /// Updates the state of XR in the scene.
-        /// </summary>
-        private static void UpdateState() {
-            
-            #region Mock HMD
-#if UNITY_EDITOR
-
-            /*
-             * Mock HMD is used for mocking XR input when there is no XR controller attached to the application.
-             * This is strictly only used in the Unity Editor and is not compiled when the game is built.
-             */
-            
-            string deviceName = XRSettings.loadedDeviceName; // get the loaded device name
-            if (MockHMDAliases.Contains(deviceName)) { // check if the loaded device should be a mock device
-                if (deviceSimulator == null) { // there is currently no loaded device simulator, create one
-                    try {
-                        deviceSimulator = Object.Instantiate(XRDeviceSimulator.Value);
-                        deviceSimulator.name = deviceName;
-                        Object.DontDestroyOnLoad(deviceSimulator);
-                        Console.Info("Instantiated XR device simulator (Mock HMD).");
-                    } catch (Exception exception) {
-                        Console.Error("Failed to instantiate XR device simulator (Mock HMD).", exception);
-                        if (deviceSimulator != null) {
-                            Object.Destroy(deviceSimulator);
-                            deviceSimulator = null;
-                        }
-                    }
-                }
-            } else if (deviceSimulator != null) { // there is a device simulator active that should be destroyed since the loaded device is not a mock device
-                Console.Info("Destroying device simulator.");
-                Object.Destroy(deviceSimulator);
+        public static void UpdateState() {
+            if (IsActive) {
+                QualitySettings.lodBias = 1.0f; // ensure the LOD bias is set correctly
             }
-#endif
-            #endregion
-
         }
 
         #endregion
@@ -146,8 +127,11 @@ namespace BlackTundra.World.XR {
                     ConsoleWindow.PrintTable(
                         new string[,] {
                             { "<b>XR Device</b>", string.Empty },
+                            { $"<color=#{Colour.Gray.hex}>Has Device</color>", HasDevice ? "true" : "false"},
                             { $"<color=#{Colour.Gray.hex}>Device Active</color>", XRSettings.isDeviceActive ? "true" : "false" },
                             { $"<color=#{Colour.Gray.hex}>Primary Device</color>", XRSettings.loadedDeviceName ?? "None" },
+                            { $"<color=#{Colour.Gray.hex}>Is Ready</color>", IsReady ? "true" : "false"},
+                            { $"<color=#{Colour.Gray.hex}>Is Active</color>", IsActive ? "true" : "false"},
 #if UNITY_EDITOR
                             { $"<color=#{Colour.Gray.hex}>Device Simulator</color>", deviceSimulator != null ? deviceSimulator.name : "None" },
 #endif

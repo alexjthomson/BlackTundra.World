@@ -13,6 +13,9 @@ namespace BlackTundra.World.XR {
     [DisallowMultipleComponent]
     [RequireComponent(typeof(XRRig))]
     [RequireComponent(typeof(CharacterController))]
+#if UNITY_EDITOR
+    [AddComponentMenu("XR/XR Player Controller")]
+#endif
     public sealed class XRPlayerController : MonoBehaviour, IControllable {
 
         #region constant
@@ -93,7 +96,7 @@ namespace BlackTundra.World.XR {
                 Console.AssertReference(camera);
             }
             camera.target = rig.cameraGameObject.transform;
-            camera.TrackingFlags = CameraTrackingFlags.None;
+            camera.TrackingFlags = CameraTrackingFlags.Parent;
             camera.nearClipPlane = NearClipDistance;
         }
 
@@ -103,6 +106,8 @@ namespace BlackTundra.World.XR {
 
         public ControlFlags OnControlGained() {
             ConfigureCamera();
+            QualitySettings.SetQualityLevel(QualitySettings.GetQualityLevel());
+            QualitySettings.lodBias *= 12.0f; // for some reason the LOD bias gets shrank while in VR
             return ControlFlags.HideCursor | ControlFlags.LockCursor;
         }
 
@@ -112,6 +117,7 @@ namespace BlackTundra.World.XR {
 
         public void OnControlRevoked() {
             if (camera != null) {
+                QualitySettings.SetQualityLevel(QualitySettings.GetQualityLevel()); // reset the quality level
                 camera.target = null;
             }
         }

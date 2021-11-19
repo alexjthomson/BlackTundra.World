@@ -16,17 +16,22 @@ namespace BlackTundra.World.CameraSystem {
         /// <summary>
         /// The camera will use smooth movement.
         /// </summary>
-        Smooth = 1,
+        Smooth = 1 << 1,
 
         /// <summary>
         /// The camera will clamp the minimum distance from the target.
         /// </summary>
-        MinClamp = 2,
+        MinClamp = 1 << 2,
 
         /// <summary>
         /// The camera will clamp the maximum distance from the target.
         /// </summary>
-        MaxClamp = 4,
+        MaxClamp = 1 << 3,
+
+        /// <summary>
+        /// The camera will make itself a child of the target and skip any other type of tracking.
+        /// </summary>
+        Parent = 1 << 4,
 
     }
 
