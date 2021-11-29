@@ -16,6 +16,35 @@ namespace BlackTundra.World.Items {
 #endif
     public sealed class WorldItem : MonoBehaviour {
 
+        #region constant
+
+        /// <summary>
+        /// Minimum square impact speed in order for an impact to be registered.
+        /// </summary>
+        public float ThresholdSqrImpactSpeed = 0.1f * 0.1f;
+
+        /// <summary>
+        /// Number of <see cref="FixedUpdate"/> calls to skip.
+        /// </summary>
+        private const int UpdateSkipCount = 100;
+
+        /// <summary>
+        /// Minimum square distance that a <see cref="WorldItem"/> must move for the <see cref="rigidbody"/> to remain enabled.
+        /// </summary>
+        private const float NotMovedDistanceSqrMagnitude = 0.05f * 0.05f;
+
+        /// <summary>
+        /// Minimum square velocity that a <see cref="WorldItem"/> must move for the <see cref="rigidbody"/> to remain enabled.
+        /// </summary>
+        private const float NotMovedVelocitySqrMagnitude = 0.01f * 0.01f;
+
+        /// <summary>
+        /// Minimum square angular velocity that a <see cref="WorldItem"/> must move for the <see cref="rigidbody"/> to remain enabled.
+        /// </summary>
+        private const float NotMovedAngularVelocitySqrMangitude = (Mathf.PI * 0.05f) * (Mathf.PI * 0.05f);
+
+        #endregion
+
         #region variable
 
         /// <summary>
@@ -80,6 +109,21 @@ namespace BlackTundra.World.Items {
         #endregion
 
         /// <summary>
+        /// <see cref="AudioSource"/> used to play impact sounds when the <see cref="WorldItem"/> impacts a surface.
+        /// </summary>
+        [SerializeField]
+        private AudioSource impactSource = null;
+
+        /// <summary>
+        /// Invoked when the <see cref="WorldItem"/> impacts a surface.
+        /// </summary>
+        /// <remarks>
+        /// Collision = collision, Vector3 = impact velocity, float = sqr impact speed.
+        /// </remarks>
+        [SerializeField]
+        private UnityEvent<Collision, Vector3, float> onImpact = null;
+
+        /// <summary>
         /// Positional offset when held.
         /// </summary>
         [SerializeField]
@@ -90,6 +134,14 @@ namespace BlackTundra.World.Items {
         /// </summary>
         [SerializeField]
         internal Vector3 holdRotationOffset = Vector3.zero;
+
+#if ENABLE_VR
+        /// <summary>
+        /// When <c>true</c>, the XR hands will be hidden while the item is grabbed.
+        /// </summary>
+        [SerializeField]
+        internal bool hideXRHands = false;
+#endif
 
         /// <summary>
         /// <see cref="IItemHolder"/> that is currently holding the <see cref="WorldItem"/>.
@@ -107,6 +159,22 @@ namespace BlackTundra.World.Items {
         /// </summary>
         private XRGrabInteractable xrGrabInteractable = null;
 #endif
+
+        /// <summary>
+        /// Number of updates to skip before checking if the <see cref="rigidbody"/> should be disabled due to not moving.
+        /// </summary>
+        private int updateSkipCounter = UpdateSkipCount;
+
+        /// <summary>
+        /// Last position the last time the <see cref="rigidbody"/> position was checked.
+        /// </summary>
+        private Vector3 lastPosition = Vector3.zero;
+
+        /// <summary>
+        /// Tracks if the <see cref="WorldItem"/> has made contact with anything yet. This is used to cull the impact sound made when the item
+        /// initially impacts the floor when the item first enters the scene.
+        /// </summary>
+        private bool initialContact = false;
 
         #endregion
 
@@ -154,6 +222,59 @@ namespace BlackTundra.World.Items {
                 ItemData itemData = ItemData.GetItem(itemDescriptor.name);
                 if (itemData != null) item = new Item(itemData.id);
             }
+            lastPosition = rigidbody.position;
+        }
+
+        #endregion
+
+        #region FixedUpdate
+
+        private void FixedUpdate() {
+            if (holder == null && --updateSkipCounter <= 0) { // update check
+                updateSkipCounter = UpdateSkipCount;
+                Vector3 position = rigidbody.position;
+                Vector3 deltaPosition = position - lastPosition;
+                float deltaPositionSqrMagnitude = deltaPosition.sqrMagnitude;
+                if (deltaPositionSqrMagnitude < NotMovedDistanceSqrMagnitude && rigidbody.velocity.sqrMagnitude < NotMovedVelocitySqrMagnitude && rigidbody.angularVelocity.sqrMagnitude < NotMovedAngularVelocitySqrMangitude) {
+                    rigidbody.isKinematic = true;
+                    rigidbody.interpolation = RigidbodyInterpolation.None;
+                    rigidbody.collisionDetectionMode = CollisionDetectionMode.Discrete;
+                    enabled = false;
+                } else {
+                    lastPosition = position;
+                }
+            }
+        }
+
+        #endregion
+
+        #region OnCollisionEnter
+
+        private void OnCollisionEnter(Collision collision) {
+            if (!enabled) {
+                updateSkipCounter = UpdateSkipCount;
+                enabled = true;
+                if (holder == null) {
+                    rigidbody.interpolation = RigidbodyInterpolation.None;
+                    rigidbody.collisionDetectionMode = CollisionDetectionMode.Discrete;
+                    rigidbody.isKinematic = false;
+                }
+            }
+            Vector3 velocity = collision.relativeVelocity;
+            float sqrSpeed = velocity.sqrMagnitude;
+            if (sqrSpeed < ThresholdSqrImpactSpeed) return;
+            if (initialContact) {
+                if (impactSource != null) {
+                    impactSource.Stop();
+                    float normalizedImpactIntensity = (1.0f - (1.0f / ((sqrSpeed * 0.1f) + 1)));
+                    impactSource.pitch = 0.95f + (0.1f * normalizedImpactIntensity) + Random.Range(-0.01f, 0.01f);
+                    impactSource.volume = normalizedImpactIntensity;
+                    impactSource.Play();
+                }
+            } else {
+                initialContact = true;
+            }
+            if (onImpact != null) onImpact.Invoke(collision, velocity, sqrSpeed);
         }
 
         #endregion
@@ -242,7 +363,9 @@ namespace BlackTundra.World.Items {
         #region PickupItem
 
         public void PickupItem(in IItemHolder holder) {
+            enabled = false;
             if (this.holder != null) {
+                if (!this.holder.CanTakeItem(this, holder)) return; // item cannot be taken
                 ReleaseItem(this.holder);
             }
             if (holder != null) {
@@ -271,6 +394,8 @@ namespace BlackTundra.World.Items {
         #region ReleaseItem
 
         public void ReleaseItem(in IItemHolder holder) {
+            updateSkipCounter = UpdateSkipCount;
+            enabled = true;
             if (this.holder == holder) {
                 try {
                     this.holder.OnReleaseItem(this);

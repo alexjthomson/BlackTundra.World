@@ -9,12 +9,12 @@ using UnityEngine;
 
 namespace BlackTundra.World.Editor.Player {
 
-    [CustomEditor(typeof(PlayerController))]
+    [CustomEditor(typeof(LocomotionBase))]
     public sealed class PlayerControllerEditor : CustomInspector {
 
         #region variable
 
-        private PlayerController controller = null;
+        private LocomotionBase controller = null;
 
         private CapsuleCollider collider = null;
 
@@ -28,7 +28,7 @@ namespace BlackTundra.World.Editor.Player {
 
         private void OnEnable() {
             bool dirty = false;
-            controller = (PlayerController)target;
+            controller = (LocomotionBase)target;
             collider = controller.GetComponent<CapsuleCollider>();
             if (collider == null) {
                 dirty = true;

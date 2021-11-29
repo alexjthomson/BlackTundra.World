@@ -1,5 +1,5 @@
 #if UNITY_EDITOR
-//#define SENSOR_DEBUG
+#define SENSOR_DEBUG
 #endif
 
 using System;

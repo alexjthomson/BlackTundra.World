@@ -363,7 +363,7 @@ namespace BlackTundra.World.CameraSystem {
         /// </summary>
         public static Vector3 MainCameraPosition {
             get {
-                if (current != null) return current.position;
+                if (current != null) return current._position;
                 else {
                     Camera mainCamera = Camera.main;
                     if (mainCamera != null) return mainCamera.transform.position;
@@ -486,46 +486,47 @@ namespace BlackTundra.World.CameraSystem {
                     }
                 }
                 transform.localPosition = localPosition;
+                _position = transform.position;
+                _rotation = transform.rotation;
             } else { // parented to original target
                 bool updateTransform = false; // track if the transform position/rotation needs to be updated
                 if (target != null) { // there is a target to track
-                    if (positionTrackingSpeed > 0.0f) { // has position tracking speed
-                        Vector3 lastPosition = _position;
-                        // apply smoothing:
-                        if ((trackingFlags & CameraTrackingFlags.Smooth) != 0) {
-                            _position = Vector3.Lerp(
-                                _position,
-                                target.position + (target.forward * midTrackingDistance),
-                                positionTrackingSpeed * deltaTime
-                            );
-                        } else {
-                            _position = target.position + (target.forward * midTrackingDistance);
-                        }
+                    Vector3 lastPosition = _position;
 
-                        // apply clamping:
-                        if ((trackingFlags & (CameraTrackingFlags.MinClamp | CameraTrackingFlags.MaxClamp)) != 0) { // positional clamping is enabled
-                            Vector3 localPosition = _position - target.position; // calculate the local position of the camera relative to the target position
-                            float sqrDistanceToTarget = localPosition.sqrMagnitude;
-                            if ((trackingFlags & CameraTrackingFlags.MinClamp) != 0 && sqrDistanceToTarget < (minTrackingDistance * minTrackingDistance)) {
-                                _position = target.position + (target.forward * minTrackingDistance);
-                            } else if ((trackingFlags & CameraTrackingFlags.MaxClamp) != 0 && sqrDistanceToTarget > (maxTrackingDistance * maxTrackingDistance)) {
-                                _position = target.position + (target.forward * maxTrackingDistance);
-                            }
-                        }
-                        velocity = (lastPosition - _position) * (1.0f / deltaTime);
+                    // apply smoothing:
+                    if ((trackingFlags & CameraTrackingFlags.Smooth) != 0) {
+                        _position = Vector3.Lerp(
+                            _position,
+                            target.position + (target.forward * midTrackingDistance),
+                            positionTrackingSpeed * deltaTime
+                        );
                     } else {
-                        velocity = Vector3.zero;
+                        _position = target.position + (target.forward * midTrackingDistance);
                     }
-                    if (rotationTrackingSpeed > 0.0f) { // has tracking speed
-                        if ((trackingFlags & CameraTrackingFlags.Smooth) != 0) {
-                            _rotation = Quaternion.Lerp(
-                                _rotation,
-                                target.rotation,
-                                rotationTrackingSpeed * deltaTime
-                            );
-                        } else {
-                            _rotation = target.rotation;
+
+                    // apply clamping:
+                    if ((trackingFlags & (CameraTrackingFlags.MinClamp | CameraTrackingFlags.MaxClamp)) != 0) { // positional clamping is enabled
+                        Vector3 localPosition = _position - target.position; // calculate the local position of the camera relative to the target position
+                        float sqrDistanceToTarget = localPosition.sqrMagnitude;
+                        if ((trackingFlags & CameraTrackingFlags.MinClamp) != 0 && sqrDistanceToTarget < (minTrackingDistance * minTrackingDistance)) {
+                            _position = target.position + (target.forward * minTrackingDistance);
+                        } else if ((trackingFlags & CameraTrackingFlags.MaxClamp) != 0 && sqrDistanceToTarget > (maxTrackingDistance * maxTrackingDistance)) {
+                            _position = target.position + (target.forward * maxTrackingDistance);
                         }
+                    }
+
+                    // calculate velocity:
+                    velocity = (lastPosition - _position) * (1.0f / deltaTime);
+
+                    // apply rotation:
+                    if ((trackingFlags & CameraTrackingFlags.Smooth) != 0) {
+                        _rotation = Quaternion.Lerp(
+                            _rotation,
+                            target.rotation,
+                            rotationTrackingSpeed * deltaTime
+                        );
+                    } else {
+                        _rotation = target.rotation;
                     }
                     updateTransform = true;
                 } else {

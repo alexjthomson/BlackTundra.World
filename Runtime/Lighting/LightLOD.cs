@@ -20,7 +20,15 @@ namespace BlackTundra.World.Lighting {
         /// </summary>
         private static readonly List<LightLOD> LightLODList = new List<LightLOD>();
 
-        private static int UpdateSkipCount = 32;
+        /// <summary>
+        /// Number of updates to skip before updaing each <see cref="LightLOD"/>.
+        /// </summary>
+        private static int UpdateSkipCount = 120;
+
+        /// <summary>
+        /// Total number of quality amounts.
+        /// </summary>
+        private const int QualityCount = 4;
 
         #endregion
 
@@ -39,10 +47,10 @@ namespace BlackTundra.World.Lighting {
         /// Quality slider for the light.
         /// </summary>
 #if UNITY_EDITOR
-        [Range(0.0f, 2.0f)]
+        [Range(0.0f, 1.0f)]
 #endif
         [SerializeField]
-        private float quality = 2.0f;
+        private float quality = 1.0f;
 
         /// <summary>
         /// When <c>true</c>, this light can be culled.
@@ -56,9 +64,11 @@ namespace BlackTundra.World.Lighting {
 #endif
         private Light light = null;
 
-        private int qualityIndex = -1;
+        private int appliedQualityIndex = -1;
 
         private float lodCoefficient = 1.0f;
+
+        private float shadowStrength = 1.0f;
 
         private static int updateSkipCounter = UpdateSkipCount;
 
@@ -77,6 +87,14 @@ namespace BlackTundra.World.Lighting {
         #endregion
 
         #region logic
+
+        #region Awake
+
+        private void Awake() {
+            shadowStrength = light.shadowStrength;
+        }
+
+        #endregion
 
         #region OnEnable
 
@@ -119,13 +137,8 @@ namespace BlackTundra.World.Lighting {
             if (light == null) return;
             float sqrDistance = (transform.position - cameraPosition).sqrMagnitude;
             float lod = sqrDistance * lodCoefficient;
-            int nextQualityIndex;
-            if (lod > 1.0f) { // at least at min quality
-                nextQualityIndex = useCulling && lod > 1.5f ? - 1 : 2; // decide to cull or render at min settings
-            } else {
-                nextQualityIndex = Mathf.FloorToInt(quality * Mathf.Sqrt(lod));
-            }
-            if (nextQualityIndex != qualityIndex) SetQualityIndex(nextQualityIndex);
+            int currentQualityIndex = lod < 1.0f ? Mathf.FloorToInt(quality * Mathf.Sqrt(lod) * QualityCount) : -1; // calculate the current quality index
+            if (currentQualityIndex != appliedQualityIndex) SetQualityIndex(currentQualityIndex); // current quality index is different to the applied index
         }
 
         #endregion
@@ -133,20 +146,24 @@ namespace BlackTundra.World.Lighting {
         #region SetQualityIndex
 
         private void SetQualityIndex(in int qualityIndex) {
-            this.qualityIndex = qualityIndex;
+            this.appliedQualityIndex = qualityIndex;
             switch (qualityIndex) {
-                case 0: {
+                case 0: { // max quality
 #if SET_SHADOW_RESOLUTION
                     light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.High;
 #endif
                     light.shadows = LightShadows.Soft;
+                    light.enabled = true;
+                    light.shadowStrength = shadowStrength;
                     break;
                 }
                 case 1: {
 #if SET_SHADOW_RESOLUTION
                     light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.Medium;
 #endif
-                    light.shadows = LightShadows.Soft;
+                    light.shadows = LightShadows.Hard;
+                    light.enabled = true;
+                    light.shadowStrength = shadowStrength;
                     break;
                 }
                 case 2: {
@@ -154,9 +171,20 @@ namespace BlackTundra.World.Lighting {
                     light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.Low;
 #endif
                     light.shadows = LightShadows.Hard;
+                    light.enabled = true;
+                    light.shadowStrength = shadowStrength;
                     break;
                 }
-                default: {
+                case 3: { // lowest quality
+#if SET_SHADOW_RESOLUTION
+                    light.shadowResolution = UnityEngine.Rendering.LightShadowResolution.Low;
+#endif
+                    light.shadows = LightShadows.None;
+                    light.enabled = true;
+                    light.shadowStrength = 0.0f;
+                    break;
+                }
+                default: { // culled
                     light.enabled = false;
                     break;
                 }

@@ -177,7 +177,7 @@ namespace BlackTundra.World.Editor.Actors {
                     //EditorLayout.Space();
 
                     // acceleration:
-                    of = profile.baseAngularSpeed;
+                    of = profile.baseAcceleration;
                     nf = Mathf.Max(EditorLayout.FloatField("Base Acceleration", of), 0.0f);
                     //EditorLayout.Info(Locomotion_BaseAcceleration_Description);
                     if (!Mathf.Approximately(nf, of)) {

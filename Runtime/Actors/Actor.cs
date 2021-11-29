@@ -11,7 +11,6 @@ using UnityEngine;
 using UnityEngine.AI;
 
 using Console = BlackTundra.Foundation.Console;
-using Object = UnityEngine.Object;
 
 namespace BlackTundra.World.Actors {
 
@@ -183,6 +182,20 @@ namespace BlackTundra.World.Actors {
             }
         }
 
+        /// <inheritdoc cref="NavMeshAgent.velocity"/>
+#pragma warning disable IDE1006 // naming styles
+        public Vector3 velocity {
+#pragma warning restore IDE1006 // naming styles
+            get => agent.velocity;
+        }
+
+        /// <inheritdoc cref="NavMeshAgent.desiredVelocity"/>
+#pragma warning disable IDE1006 // naming styles
+        public Vector3 desiredVelocity {
+#pragma warning restore IDE1006 // naming styles
+            get => agent.desiredVelocity;
+        }
+
         /// <summary>
         /// Coefficient used to control the maximum angular speed relative to the base angular speed of the <see cref="Actor"/>.
         /// </summary>
@@ -283,7 +296,12 @@ namespace BlackTundra.World.Actors {
         /// <see cref="TargetPosition"/> is less than or equal to the <c>stoppingDistance</c> on the <see cref="NavMeshAgent"/>
         /// component.
         /// </summary>
-        public bool HasReachedTargetPosition => !agent.hasPath || agent.remainingDistance <= agent.stoppingDistance;
+        public bool HasReachedTargetPosition => !agent.pathPending && (!agent.hasPath || agent.remainingDistance <= agent.stoppingDistance);
+
+        /// <summary>
+        /// Checks if the <see cref="Actor"/> is moving.
+        /// </summary>
+        public bool IsMoving => agent.velocity.sqrMagnitude > Mathf.Epsilon;
 
         /// <summary>
         /// Suspected position of the target that the <see cref="Actor"/> is tracking.
@@ -327,6 +345,26 @@ namespace BlackTundra.World.Actors {
         /// Returns <c>true</c> if the <see cref="Actor"/> is on a <see cref="NavMesh"/>.
         /// </summary>
         public bool IsDirectable => agent.isOnNavMesh;
+
+        /// <summary>
+        /// Returns <c>true</c> if the <see cref="Actor"/> is paused.
+        /// </summary>
+        public bool IsPaused => agent.isStopped;
+
+        /// <summary>
+        /// Number of seconds since the <see cref="Actor"/> was last updated.
+        /// </summary>
+        public float TimeSinceUpdate => Time.time - currentTime;
+
+        /// <summary>
+        /// Number of seconds between the last time the <see cref="Actor"/> was updated and the time before the last time the <see cref="Actor"/> was updated.
+        /// </summary>
+        public float LastDeltaTime => currentTime - lastTime;
+
+        /// <summary>
+        /// Estimated time between updates of actors.
+        /// </summary>
+        public static float EstimatedUpdateInterval => ((ActorBuffer.Count / ActorBufferBatchUpdateSize) + 1) * Time.deltaTime;
 
         #endregion
 
@@ -465,6 +503,37 @@ namespace BlackTundra.World.Actors {
 
         #endregion
 
+        #region RemoveTarget
+
+        /// <summary>
+        /// Removes the <see cref="Actor"/> <see cref="TargetCollider"/> and <see cref="TargetPosition"/>.
+        /// </summary>
+        public void RemoveTarget() {
+            targetPosition = transform.position;
+            targetCollider = null;
+            updateTarget = true;
+        }
+
+        #endregion
+
+        #region Resume
+
+        /// <summary>
+        /// Resumes travelling to the <see cref="TargetPosition"/>.
+        /// </summary>
+        public void Resume() => agent.isStopped = false;
+
+        #endregion
+
+        #region Pause
+
+        /// <summary>
+        /// Pauses travelling to the <see cref="TargetPosition"/>.
+        /// </summary>
+        public void Pause() => agent.isStopped = true;
+
+        #endregion
+
         #region ResetAll
 
         private void ResetAll() {
@@ -489,6 +558,8 @@ namespace BlackTundra.World.Actors {
         private void ResetTarget() {
             targetPosition = transform.position;
             targetCollider = null;
+            agent.isStopped = false;
+            agent.velocity = Vector3.zero;
             updateTarget = true;
         }
 
@@ -524,11 +595,10 @@ namespace BlackTundra.World.Actors {
         /// <summary>
         /// Sets the <see cref="TargetCollider"/>.
         /// </summary>
-        public void SetTargetCollider(in Collider target) {
-            if (target == null) throw new ArgumentNullException(nameof(target)); // the target is null
-            Collider nextTarget = profile.visionSensor.IsDetectable(target) ? target : null; // the target is visible
-            if (nextTarget != targetCollider) { // the next target collider is different to the current collider
-                targetCollider = nextTarget;
+        public void SetTargetCollider(Collider target) {
+            if (target != null && !profile.visionSensor.IsDetectable(target)) target = null;
+            if (target != targetCollider) { // the target collider is different to the current collider
+                targetCollider = target;
                 updateTarget = true;
             }
         }
@@ -574,6 +644,7 @@ namespace BlackTundra.World.Actors {
                 behaviour?.OnBehaviourChanged(nextBehaviour);
                 behaviour = nextBehaviour;
                 nextBehaviour.actor = this;
+                nextBehaviour.agent = agent;
                 nextBehaviour.OnBehaviourStarted(previousBehaviour);
             } finally {
                 behaviourLock = false;

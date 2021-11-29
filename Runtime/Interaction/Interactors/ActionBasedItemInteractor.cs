@@ -173,7 +173,7 @@ namespace BlackTundra.World.Interaction.Interactors {
         /// </summary>
         private bool CastInteractionRay(out WorldItem item) {
             if (Physics.Raycast(transform.position, transform.forward, out RaycastHit hit, range, layerMask, QueryTriggerInteraction.Ignore)) { // cast pickup ray
-                item = hit.collider.GetComponent<WorldItem>();
+                item = hit.collider.GetComponentInParent<WorldItem>();
                 return item != null && item.ItemHolder == null;
             } else {
                 item = null;
@@ -230,6 +230,12 @@ namespace BlackTundra.World.Interaction.Interactors {
         public bool IsHoldingItem() => item != null;
 
         public bool IsHoldingItem(in WorldItem item) => item != null && this.item == item;
+
+        #endregion
+
+        #region CanTakeItem
+
+        public bool CanTakeItem(in WorldItem item, in IItemHolder holder) => item != null && item != this.item;
 
         #endregion
 

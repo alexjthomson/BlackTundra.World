@@ -14,7 +14,7 @@ namespace BlackTundra.World.Player {
     [DisallowMultipleComponent]
     [RequireComponent(typeof(CapsuleCollider))]
     [RequireComponent(typeof(CharacterController))]
-    public sealed class PlayerController : MonoBehaviour {
+    public abstract class LocomotionBase : MonoBehaviour {
 
         #region variable
 
@@ -145,16 +145,17 @@ namespace BlackTundra.World.Player {
         #region property
 
         /// <summary>
-        /// Height of the <see cref="PlayerController"/>.
+        /// Height of the <see cref="LocomotionBase"/>.
         /// </summary>
 #pragma warning disable IDE1006 // naming styles
         public float height {
 #pragma warning restore IDE1006 // naming styles
             get => collider.height;
             set {
-                float height = Mathf.Max(value, collider.radius * 2.0f, character.skinWidth * 2.0f);
+                float skinWidth = character.skinWidth;
+                float height = Mathf.Max(value, collider.radius * 2.0f, skinWidth * 2.0f);
                 collider.height = height;
-                character.height = height;
+                character.height = height - (2.0f * skinWidth);
                 Vector3 center = new Vector3(0.0f, height * 0.5f, 0.0f);
                 collider.center = center;
                 character.center = center;
@@ -162,7 +163,7 @@ namespace BlackTundra.World.Player {
         }
 
         /// <summary>
-        /// Radius of the <see cref="PlayerController"/>.
+        /// Radius of the <see cref="LocomotionBase"/>.
         /// </summary>
 #pragma warning disable IDE1006 // naming styles
         public float radius {
@@ -177,7 +178,7 @@ namespace BlackTundra.World.Player {
         }
 
         /// <summary>
-        /// Width of the skin for the <see cref="PlayerController"/>. The thicker the skin is, the better quality
+        /// Width of the skin for the <see cref="LocomotionBase"/>. The thicker the skin is, the better quality
         /// collisions are.
         /// </summary>
 #pragma warning disable IDE1006 // naming styles
@@ -203,7 +204,7 @@ namespace BlackTundra.World.Player {
         }
 
         /// <summary>
-        /// Mass of the <see cref="PlayerController"/> in kg.
+        /// Mass of the <see cref="LocomotionBase"/> in kg.
         /// </summary>
 #pragma warning disable IDE1006 // naming styles
         public float mass {
@@ -223,7 +224,7 @@ namespace BlackTundra.World.Player {
         }
 
         /// <summary>
-        /// Drag coefficient applied to physical velocities acting upon this <see cref="PlayerController"/>. This can be
+        /// Drag coefficient applied to physical velocities acting upon this <see cref="LocomotionBase"/>. This can be
         /// thought as the air-resistance coefficient.
         /// </summary>
 #pragma warning disable IDE1006 // naming styles
@@ -258,7 +259,7 @@ namespace BlackTundra.World.Player {
         }
 
         /// <summary>
-        /// <c>true</c> while the <see cref="PlayerController"/> is grounded.
+        /// <c>true</c> while the <see cref="LocomotionBase"/> is grounded.
         /// </summary>
         public bool IsGrounded => grounded;
 
@@ -267,13 +268,13 @@ namespace BlackTundra.World.Player {
         #region event
 
         /// <summary>
-        /// Event invoked when the <see cref="PlayerController"/> impacts the ground. The first event argument is the
-        /// velocity that the <see cref="PlayerController"/> impacted the ground with.
+        /// Event invoked when the <see cref="LocomotionBase"/> impacts the ground. The first event argument is the
+        /// velocity that the <see cref="LocomotionBase"/> impacted the ground with.
         /// </summary>
         public event Action<Vector3> OnImpactGround;
 
         /// <summary>
-        /// Event invoked when the <see cref="PlayerController"/> leaves the ground.
+        /// Event invoked when the <see cref="LocomotionBase"/> leaves the ground.
         /// </summary>
         public event Action OnLeaveGround;
 
@@ -396,7 +397,7 @@ namespace BlackTundra.World.Player {
         #region AddForce
 
         /// <summary>
-        /// Adds a force to the <see cref="PlayerController"/>.
+        /// Adds a force to the <see cref="LocomotionBase"/>.
         /// The force is applied instantly and takes into account mass.
         /// </summary>
         public void AddForce(in Vector3 force) {
@@ -408,7 +409,7 @@ namespace BlackTundra.World.Player {
         #region AddVelocity
 
         /// <summary>
-        /// Adds velocity to the <see cref="PlayerController"/>.
+        /// Adds velocity to the <see cref="LocomotionBase"/>.
         /// This does not take into account mass and the velocity is applied instantly.
         /// </summary>
         public void AddVelocity(in Vector3 velocity) {

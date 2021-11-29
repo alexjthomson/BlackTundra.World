@@ -89,7 +89,7 @@ namespace BlackTundra.World.Interaction.Interactors {
                 }
             } else { // there is no interaction currently active
                 if (Physics.Raycast(transform.position, transform.forward, out RaycastHit hit, range, layerMask, QueryTriggerInteraction.Ignore)) { // cast interaction ray
-                    IInteractable currentInteractable = hit.collider.GetComponent<IInteractable>(); // get any element that implements the IInteractable interface
+                    IInteractable currentInteractable = hit.collider.GetComponentInParent<IInteractable>(); // get any element that implements the IInteractable interface
                     if (currentInteractable == null) { // no interactable component was hit
                         interactable = null;
                     } else { // the hit object is an interactable component

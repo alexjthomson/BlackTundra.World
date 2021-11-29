@@ -3,6 +3,9 @@
 using BlackTundra.Foundation.Utility;
 using BlackTundra.World.Items;
 
+using System;
+using System.Collections.Generic;
+
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.XR.Interaction.Toolkit;
@@ -158,9 +161,20 @@ namespace BlackTundra.World.XR {
                         if (collision) break; // collisions have remained on since the current near collider is not part of the item
                     }
                 }
-                if (collision != useCollisions) {
+                if (collision != useCollisions) { // collision mode has changed
                     useCollisions = collision;
-                    item.rigidbody.detectCollisions = useCollisions;
+                    Rigidbody rigidbody = item.rigidbody;
+                    if (useCollisions) {
+                        rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
+                        rigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
+                        rigidbody.detectCollisions = true;
+                        rigidbody.isKinematic = false;
+                    } else {
+                        rigidbody.interpolation = RigidbodyInterpolation.None;
+                        rigidbody.collisionDetectionMode = CollisionDetectionMode.Discrete;
+                        rigidbody.detectCollisions = false;
+                        rigidbody.isKinematic = true;
+                    }
                 }
             }
         }
@@ -171,8 +185,8 @@ namespace BlackTundra.World.XR {
 
         private void LateUpdate() {
             if (item != null && !useCollisions) {
-                item.transform.position = transform.position + (transform.rotation * itemPositionalOffset);
                 item.transform.rotation = transform.rotation * itemRotationalOffset;
+                item.transform.position = transform.position + (item.transform.rotation * itemPositionalOffset);
             }
         }
 
@@ -182,7 +196,11 @@ namespace BlackTundra.World.XR {
 
         private void ResetItemCollision() {
             useCollisions = true;
-            item.rigidbody.detectCollisions = true;
+            Rigidbody rigidbody = item.rigidbody;
+            rigidbody.interpolation = RigidbodyInterpolation.None;
+            rigidbody.collisionDetectionMode = CollisionDetectionMode.Discrete;
+            rigidbody.detectCollisions = true;
+            rigidbody.isKinematic = false;
         }
 
         #endregion
@@ -195,16 +213,31 @@ namespace BlackTundra.World.XR {
 
         #endregion
 
+        #region CanTakeItem
+
+        public bool CanTakeItem(in WorldItem item, in IItemHolder holder) => item != null && item != this.item;
+
+        #endregion
+
         #region OnHoldItem
 
         public void OnHoldItem(in WorldItem item) {
+            if (item == null) throw new ArgumentNullException(nameof(item));
             this.item = item;
+            Transform model = controller.model;
+            if (model != null) model.gameObject.SetActive(!item.hideXRHands);
             ResetItemCollision();
             XRGrabInteractable xrGrabInteractable = item.GetComponent<XRGrabInteractable>();
             if (xrGrabInteractable != null && xrGrabInteractable.attachTransform != null) {
                 itemPositionalOffset = -item.transform.InverseTransformPoint(xrGrabInteractable.attachTransform.position);
                 itemRotationalOffset = Quaternion.Inverse(xrGrabInteractable.attachTransform.rotation) * item.transform.rotation;
-                itemColliders = item.GetComponentsInChildren<Collider>();
+                List<Collider> colliderList = new List<Collider>(item.GetComponentsInChildren<Collider>());
+                Collider currentCollider;
+                for (int i = colliderList.Count - 1; i >= 0; i--) {
+                    currentCollider = colliderList[i];
+                    if (currentCollider.isTrigger) colliderList.RemoveAt(i);
+                }
+                itemColliders = colliderList.ToArray();
                 physicsColliderBuffer = new Collider[itemColliders.Length + 1];
             } else {
                 itemPositionalOffset = Vector3.zero;
@@ -218,14 +251,16 @@ namespace BlackTundra.World.XR {
         #region OnReleaseItem
 
         public void OnReleaseItem(in WorldItem item) {
-            if (item != null && this.item == item) {
-                ResetItemCollision();
-                itemColliders = null;
-                item.SetPrimaryUseState(false);
-                item.SetSecondaryUseState(false);
-                item.SetTertiaryUseState(false);
-                this.item = null;
-            }
+            if (item == null) throw new ArgumentNullException(nameof(item));
+            if (this.item != item) return;
+            Transform model = controller.model;
+            if (model != null) model.gameObject.SetActive(true);
+            ResetItemCollision();
+            itemColliders = null;
+            item.SetPrimaryUseState(false);
+            item.SetSecondaryUseState(false);
+            item.SetTertiaryUseState(false);
+            this.item = null;
         }
 
         #endregion
