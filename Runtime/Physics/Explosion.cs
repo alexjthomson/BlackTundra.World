@@ -1,4 +1,5 @@
 using BlackTundra.World.CameraSystem;
+using BlackTundra.World.Items;
 
 using System;
 
@@ -20,9 +21,12 @@ namespace BlackTundra.World {
             int colliderCount = colliders.Length;
             if (colliderCount > 0) {
                 Rigidbody rigidbody;
+                WorldItem item;
                 for (int i = colliderCount - 1; i >= 0; i--) {
                     rigidbody = colliders[i].GetComponent<Rigidbody>();
                     if (rigidbody != null) {
+                        item = rigidbody.GetComponent<WorldItem>();
+                        if (item != null) item.EnablePhysics();
                         rigidbody.AddExplosionForce(force, point, radius);
                     }
                 }
@@ -31,7 +35,7 @@ namespace BlackTundra.World {
                 force -= 1000.0f;
                 return CameraShakeSource.CreateAt(
                     point,
-                    Mathf.Clamp(force * 0.005f, 0.0f, 2.5f),
+                    Mathf.Clamp(force * 0.005f, 0.0f, 1.0f),
                     Mathf.Clamp(force * 0.01f, 25.0f, 75.0f),
                     false,
                     Mathf.Clamp(force * 0.00025f, 0.5f, 1.0f),

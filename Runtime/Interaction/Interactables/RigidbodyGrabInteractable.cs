@@ -3,6 +3,7 @@ using BlackTundra.Foundation.Utility;
 using System;
 
 using UnityEngine;
+using UnityEngine.Events;
 
 using Console = BlackTundra.Foundation.Console;
 
@@ -27,6 +28,29 @@ namespace BlackTundra.World.Interaction.Interactables {
         [SerializeField]
         [Min(0.01f)]
         private float power = 1.0f;
+
+        /// <summary>
+        /// Invoked when the interaction state changes.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="bool"/>: <c>true</c> if the interaction was started, <c>false</c> if the interaction was ended.
+        /// <see cref="Behaviour"/>: <see cref="Behaviour"/> component that made the interaction.
+        /// <see cref="object">object[]</see>: Parameters passed into the interaction.
+        /// </remarks>
+        [SerializeField]
+        private UnityEvent<bool, Behaviour, object[]> onInteract = null;
+
+        /// <summary>
+        /// Invoked when an interaction starts.
+        /// </summary>
+        [SerializeField]
+        private UnityEvent onInteractStart = null;
+
+        /// <summary>
+        /// Invoked when an interaction stops.
+        /// </summary>
+        [SerializeField]
+        private UnityEvent onInteractStop = null;
 
         /// <summary>
         /// Interaction sender.
@@ -87,11 +111,13 @@ namespace BlackTundra.World.Interaction.Interactables {
         /// Invoked when an interaction starts.
         /// </summary>
         public bool InteractStart(in object sender, in object[] parameters) {
-            if (sender is Component component) {
-                senderTransform = component.transform;
+            if (sender is Behaviour behaviour) {
+                senderTransform = behaviour.transform;
                 Vector3 forward = senderTransform.forward;
                 targetDistance = Vector3.Distance(MathsUtility.ClosestPointOnLine(rigidbody.position, senderTransform.position, senderTransform.position + forward), senderTransform.position);
                 enabled = true;
+                if (onInteract != null) onInteract.Invoke(true, behaviour, parameters);
+                if (onInteractStart != null) onInteractStart.Invoke();
                 return true;
             }
             return false;
@@ -105,9 +131,11 @@ namespace BlackTundra.World.Interaction.Interactables {
         /// Invoked when an interaction ends.
         /// </summary>
         public bool InteractStop(in object sender, in object[] parameters) {
-            if (senderTransform != null && sender is Component component && senderTransform == component.transform) {
+            if (senderTransform != null && sender is Behaviour behaviour && senderTransform == behaviour.transform) {
                 enabled = false;
                 senderTransform = null;
+                if (onInteract != null) onInteract.Invoke(true, behaviour, parameters);
+                if (onInteractStop != null) onInteractStop.Invoke();
                 return true;
             }
             return false;

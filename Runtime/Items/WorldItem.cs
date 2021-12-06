@@ -43,6 +43,11 @@ namespace BlackTundra.World.Items {
         /// </summary>
         private const float NotMovedAngularVelocitySqrMangitude = (Mathf.PI * 0.05f) * (Mathf.PI * 0.05f);
 
+        /// <summary>
+        /// Minimum Y level before an item is considered to have "fallen" out of the map.
+        /// </summary>
+        private const float MinYLevel = -100;
+
         #endregion
 
         #region variable
@@ -115,6 +120,15 @@ namespace BlackTundra.World.Items {
         private AudioSource impactSource = null;
 
         /// <summary>
+        /// Maximum volume that the <see cref="impactSource"/> can have.
+        /// </summary>
+#if UNITY_EDITOR
+        [Range(0.0f, 1.0f)]
+#endif
+        [SerializeField]
+        private float impactVolume = 1.0f;
+
+        /// <summary>
         /// Invoked when the <see cref="WorldItem"/> impacts a surface.
         /// </summary>
         /// <remarks>
@@ -171,6 +185,18 @@ namespace BlackTundra.World.Items {
         private Vector3 lastPosition = Vector3.zero;
 
         /// <summary>
+        /// Last position that the <see cref="WorldItem"/> was stable. If the item finds itself to be stuck inside of a collider or out of bounds
+        /// it will teleport the item to this position.
+        /// </summary>
+        private Vector3 lastStablePosition = Vector3.zero;
+
+        /// <summary>
+        /// Similar to the <see cref="lastStablePosition"/> but this records the rotation of the <see cref="WorldItem"/> when it was in the
+        /// <see cref="lastStablePosition"/>.
+        /// </summary>
+        private Quaternion lastStableRotation = Quaternion.identity;
+
+        /// <summary>
         /// Tracks if the <see cref="WorldItem"/> has made contact with anything yet. This is used to cull the impact sound made when the item
         /// initially impacts the floor when the item first enters the scene.
         /// </summary>
@@ -223,6 +249,8 @@ namespace BlackTundra.World.Items {
                 if (itemData != null) item = new Item(itemData.id);
             }
             lastPosition = rigidbody.position;
+            lastStablePosition = lastPosition;
+            lastStableRotation = rigidbody.rotation;
         }
 
         #endregion
@@ -230,18 +258,22 @@ namespace BlackTundra.World.Items {
         #region FixedUpdate
 
         private void FixedUpdate() {
-            if (holder == null && --updateSkipCounter <= 0) { // update check
+            if (holder == null && --updateSkipCounter <= 0) { // physics disable check
                 updateSkipCounter = UpdateSkipCount;
                 Vector3 position = rigidbody.position;
-                Vector3 deltaPosition = position - lastPosition;
-                float deltaPositionSqrMagnitude = deltaPosition.sqrMagnitude;
-                if (deltaPositionSqrMagnitude < NotMovedDistanceSqrMagnitude && rigidbody.velocity.sqrMagnitude < NotMovedVelocitySqrMagnitude && rigidbody.angularVelocity.sqrMagnitude < NotMovedAngularVelocitySqrMangitude) {
-                    rigidbody.isKinematic = true;
-                    rigidbody.interpolation = RigidbodyInterpolation.None;
-                    rigidbody.collisionDetectionMode = CollisionDetectionMode.Discrete;
-                    enabled = false;
+                if (position.y < MinYLevel) {
+                    ReturnToLastStablePosition();
                 } else {
-                    lastPosition = position;
+                    Vector3 deltaPosition = position - lastPosition;
+                    float deltaPositionSqrMagnitude = deltaPosition.sqrMagnitude;
+                    if (deltaPositionSqrMagnitude < NotMovedDistanceSqrMagnitude
+                        && rigidbody.velocity.sqrMagnitude < NotMovedVelocitySqrMagnitude
+                        && rigidbody.angularVelocity.sqrMagnitude < NotMovedAngularVelocitySqrMangitude
+                    ) {
+                        DisablePhysics();
+                    } else {
+                        lastPosition = position;
+                    }
                 }
             }
         }
@@ -251,30 +283,39 @@ namespace BlackTundra.World.Items {
         #region OnCollisionEnter
 
         private void OnCollisionEnter(Collision collision) {
-            if (!enabled) {
-                updateSkipCounter = UpdateSkipCount;
-                enabled = true;
-                if (holder == null) {
-                    rigidbody.interpolation = RigidbodyInterpolation.None;
-                    rigidbody.collisionDetectionMode = CollisionDetectionMode.Discrete;
-                    rigidbody.isKinematic = false;
-                }
-            }
+            EnablePhysics();
             Vector3 velocity = collision.relativeVelocity;
             float sqrSpeed = velocity.sqrMagnitude;
             if (sqrSpeed < ThresholdSqrImpactSpeed) return;
             if (initialContact) {
                 if (impactSource != null) {
-                    impactSource.Stop();
                     float normalizedImpactIntensity = (1.0f - (1.0f / ((sqrSpeed * 0.1f) + 1)));
-                    impactSource.pitch = 0.95f + (0.1f * normalizedImpactIntensity) + Random.Range(-0.01f, 0.01f);
-                    impactSource.volume = normalizedImpactIntensity;
-                    impactSource.Play();
+                    if (impactSource.isPlaying) {
+                        impactSource.PlayOneShot(impactSource.clip, normalizedImpactIntensity);
+                    } else {
+                        impactSource.pitch = 0.95f + (0.1f * normalizedImpactIntensity) + Random.Range(-0.01f, 0.01f);
+                        impactSource.volume = normalizedImpactIntensity * impactVolume;
+                        impactSource.Play();
+                    }
                 }
             } else {
                 initialContact = true;
             }
             if (onImpact != null) onImpact.Invoke(collision, velocity, sqrSpeed);
+        }
+
+        #endregion
+
+        #region ReturnToLastStablePosition
+
+        /// <summary>
+        /// Returns the <see cref="WorldItem"/> to the last stable position (and rotation).
+        /// </summary>
+        private void ReturnToLastStablePosition() {
+            rigidbody.isKinematic = true;
+            rigidbody.position = lastStablePosition;
+            rigidbody.rotation = lastStableRotation;
+            DisablePhysics();
         }
 
         #endregion
@@ -422,6 +463,35 @@ namespace BlackTundra.World.Items {
             }
         }
 #endif
+        #endregion
+
+        #region EnablePhysics
+
+        public void EnablePhysics() {
+            if (!enabled && holder == null) {
+                updateSkipCounter = UpdateSkipCount;
+                enabled = true;
+                rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
+                rigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+                rigidbody.isKinematic = false;
+            }
+        }
+
+        #endregion
+
+        #region DisablePhysics
+
+        public void DisablePhysics() {
+            rigidbody.isKinematic = true;
+            rigidbody.interpolation = RigidbodyInterpolation.None;
+            rigidbody.collisionDetectionMode = CollisionDetectionMode.Discrete;
+            rigidbody.velocity = Vector3.zero;
+            rigidbody.angularVelocity = Vector3.zero;
+            lastStablePosition = rigidbody.position;
+            lastStableRotation = rigidbody.rotation;
+            enabled = false;
+        }
+
         #endregion
 
         #endregion
