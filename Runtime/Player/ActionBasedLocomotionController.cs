@@ -108,7 +108,7 @@ namespace BlackTundra.World.Player {
 
         private static SmoothVector2 moveVelocity = new SmoothVector2(0.0f, 0.0f, DefaultMoveSmoothingX, DefaultMoveSmoothingY);
         private static SmoothVector2 lookVelocity = new SmoothVector2(0.0f, 0.0f, DefaultLookSmoothingX, DefaultLookSmoothingY);
-        private static SmoothFloat sprintVelocity = new SmoothFloat(0.0f);
+        private SmoothFloat sprintAmount = new SmoothFloat(0.0f);
 
         #endregion
 
@@ -271,14 +271,14 @@ namespace BlackTundra.World.Player {
             Vector2 moveVector = inputMoveAction.ReadValue<Vector2>();
             moveVelocity.Apply(moveVector, deltaTime);
             bool isMovingForward = moveVector.y > 0.0f;
-            sprintVelocity.Apply(
+            sprintAmount.Apply(
                 isMovingForward
                     ? inputSprintAction.ReadValue<float>()
                     : 0.0f,
                 SprintSmoothing * deltaTime
             );
             float sprintCoefficient = isMovingForward
-                ? Mathf.Lerp(1.0f, MoveSprintSpeedCoefficient, sprintVelocity.value)
+                ? Mathf.Lerp(1.0f, MoveSprintSpeedCoefficient, sprintAmount.value)
                 : 1.0f;
             Vector3 movementVector = new Vector3(
                 Mathf.Clamp(moveVelocity.x, -1.0f, 1.0f) * sprintCoefficient * MoveBaseStrafeSpeed,

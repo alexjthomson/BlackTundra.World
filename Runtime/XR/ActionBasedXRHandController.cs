@@ -20,11 +20,13 @@ namespace BlackTundra.World.XR {
 #if UNITY_EDITOR
     [AddComponentMenu("XR/XR Hand Controller (Action-based)")]
 #endif
-    public sealed class XRActionBasedHandController : MonoBehaviour, IItemHolder {
+    public sealed class ActionBasedXRHandController : MonoBehaviour, IItemHolder {
 
         #region constant
 
         public const string GripAnimatorPropertyName = "Grip";
+
+        private const float GripAmountSmoothing = 10.0f;
 
         #endregion
 
@@ -83,6 +85,11 @@ namespace BlackTundra.World.XR {
         /// </summary>
         private bool useCollisions = false;
 
+        /// <summary>
+        /// Smooth grip amount.
+        /// </summary>
+        private SmoothFloat gripAmount = new SmoothFloat(0.0f);
+
         #endregion
 
         #region logic
@@ -113,7 +120,8 @@ namespace BlackTundra.World.XR {
 
         private void Update() {
             if (handAnimator != null) {
-                handAnimator.SetFloat(GripAnimatorPropertyName, _gripAction.ReadValue<float>());
+                gripAmount.Apply(_gripAction.ReadValue<float>(), GripAmountSmoothing * Time.deltaTime);
+                handAnimator.SetFloat(GripAnimatorPropertyName, gripAmount.value);
             } else {
                 UpdateHands();
             }
