@@ -619,6 +619,35 @@ namespace BlackTundra.World.Actors {
 
         #endregion
 
+        #region RemoveTargetCollider
+
+        /// <summary>
+        /// Removes the current <see cref="TargetCollider"/>.
+        /// </summary>
+        public void RemoveTargetCollider() {
+            targetCollider = null;
+            updateTarget = true;
+        }
+
+        #endregion
+
+        #region RemoveTargetPosition
+
+        /// <summary>
+        /// Resets the current <see cref="TargetPosition"/> to the current position of the <see cref="Actor"/>.
+        /// </summary>
+        /// <remarks>
+        /// If the <see cref="TargetCollider"/> is set, it will also be removed.
+        /// </remarks>
+        public void RemoveTargetPosition() {
+            targetCollider = null;
+            targetPosition = transform.position;
+            targetSpeed = Vector3.zero;
+            updateTarget = true;
+        }
+
+        #endregion
+
         #region SetBehaviour
 
         /// <summary>

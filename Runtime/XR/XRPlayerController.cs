@@ -22,6 +22,11 @@ namespace BlackTundra.World.XR {
 
         private const float NearClipDistance = 0.01f;
 
+        /// <summary>
+        /// Amount to increase the LOD bias by.
+        /// </summary>
+        private const float LODIncrease = 15.0f;
+
         #endregion
 
         #region variable
@@ -107,7 +112,7 @@ namespace BlackTundra.World.XR {
         public ControlFlags OnControlGained() {
             ConfigureCamera();
             QualitySettings.SetQualityLevel(QualitySettings.GetQualityLevel());
-            QualitySettings.lodBias *= 12.0f; // for some reason the LOD bias gets shrank while in VR
+            QualitySettings.lodBias *= LODIncrease; // for some reason the LOD bias gets shrank while in VR
             return ControlFlags.HideCursor | ControlFlags.LockCursor;
         }
 
@@ -118,6 +123,7 @@ namespace BlackTundra.World.XR {
         public void OnControlRevoked() {
             if (camera != null) {
                 QualitySettings.SetQualityLevel(QualitySettings.GetQualityLevel()); // reset the quality level
+                camera.TrackingFlags = CameraTrackingFlags.None;
                 camera.target = null;
             }
         }

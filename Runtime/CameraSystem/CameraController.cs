@@ -134,7 +134,7 @@ namespace BlackTundra.World.CameraSystem {
             set {
                 if (value == _target || value == transform) return;
                 _target = value;
-                if ((trackingFlags | CameraTrackingFlags.Parent) != 0) {
+                if (_target != null && (trackingFlags | CameraTrackingFlags.Parent) != 0) {
                     transform.parent = _target;
                 } else {
                     transform.parent = originalParent;
