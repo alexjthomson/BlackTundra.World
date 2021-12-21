@@ -1,8 +1,13 @@
-using BlackTundra.World.Interaction;
+using BlackTundra.Foundation.Utility;
+#if ENABLE_VR
+using BlackTundra.World.XR;
+#endif
 
 using UnityEngine;
 using UnityEngine.Events;
+#if ENABLE_VR
 using UnityEngine.XR.Interaction.Toolkit;
+#endif
 
 namespace BlackTundra.World.Items {
 
@@ -113,6 +118,20 @@ namespace BlackTundra.World.Items {
 
         #endregion
 
+        #region snap point
+
+#if ENABLE_VR
+        [SerializeField]
+        private UnityEvent<XRItemSnapPoint, SelectEnterEventArgs> onXRItemSnapPointEnter = null;
+#endif
+
+#if ENABLE_VR
+        [SerializeField]
+        private UnityEvent<XRItemSnapPoint, SelectExitEventArgs> onXRItemSnapPointExit = null;
+#endif
+
+        #endregion
+
         /// <summary>
         /// <see cref="AudioSource"/> used to play impact sounds when the <see cref="WorldItem"/> impacts a surface.
         /// </summary>
@@ -202,6 +221,21 @@ namespace BlackTundra.World.Items {
         /// </summary>
         private bool initialContact = false;
 
+        /// <summary>
+        /// Cached <see cref="Collider"/> array.
+        /// </summary>
+        private Collider[] colliders = null;
+
+        /// <summary>
+        /// Cached states of each collider.
+        /// </summary>
+        private bool[] colliderStates = null;
+
+        /// <summary>
+        /// Cached layers of assigned to each of the <see cref="colliders"/>.
+        /// </summary>
+        private int[] colliderLayers = null;
+
         #endregion
 
         #region property
@@ -217,13 +251,32 @@ namespace BlackTundra.World.Items {
 #pragma warning restore IDE1006 // naming styles
 
         /// <summary>
+        /// <c>true</c> when the <see cref="WorldItem"/> physics are active.
+        /// </summary>
+#pragma warning disable IDE1006 // naming styles
+        public bool isPhysicsActive { get; private set; } = true;
+#pragma warning restore IDE1006 // naming styles
+
+        /// <summary>
+        /// Last time that the <see cref="WorldItem"/> was picked up (grabbed).
+        /// </summary>
+#pragma warning disable IDE1006 // naming styles
+        public float lastPickupTime { get; private set; } = 0.0f;
+#pragma warning restore IDE1006 // naming styles
+
+        /// <summary>
+        /// Last time that the <see cref="WorldItem"/> was released (dropped).
+        /// </summary>
+#pragma warning disable IDE1006 // naming styles
+        public float lastReleaseTime { get; private set; } = 0.0f;
+#pragma warning restore IDE1006 // naming styles
+
+        /// <summary>
         /// <see cref="IItemHolder"/> instance currently holding this <see cref="WorldItem"/>.
         /// </summary>
         public IItemHolder ItemHolder => holder;
 
-        public Item Item {
-            get => item;
-        }
+        public Item Item => item;
 
         public Vector3 LocalHoldPosition => holdPositionOffset;
 
@@ -413,6 +466,7 @@ namespace BlackTundra.World.Items {
                 this.holder = holder;
                 this.holder.OnHoldItem(this);
             }
+            lastPickupTime = Time.time;
             onItemPickup?.Invoke();
         }
 
@@ -444,6 +498,7 @@ namespace BlackTundra.World.Items {
                     this.holder = null;
                 }
             }
+            lastReleaseTime = Time.time;
             onItemDrop.Invoke();
         }
 
@@ -468,7 +523,8 @@ namespace BlackTundra.World.Items {
         #region EnablePhysics
 
         public void EnablePhysics() {
-            if (!enabled && holder == null) {
+            if (!enabled && holder == null && colliders == null) {
+                isPhysicsActive = true;
                 updateSkipCounter = UpdateSkipCount;
                 enabled = true;
                 rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
@@ -482,6 +538,7 @@ namespace BlackTundra.World.Items {
         #region DisablePhysics
 
         public void DisablePhysics() {
+            isPhysicsActive = false;
             rigidbody.isKinematic = true;
             rigidbody.interpolation = RigidbodyInterpolation.None;
             rigidbody.collisionDetectionMode = CollisionDetectionMode.Discrete;
@@ -492,6 +549,89 @@ namespace BlackTundra.World.Items {
             enabled = false;
         }
 
+        #endregion
+
+        #region EnableCollision
+
+        public void EnableCollision() {
+            if (colliders == null || colliderStates == null) return;
+            Collider collider;
+            for (int i = colliders.Length - 1; i >= 0; i--) {
+                collider = colliders[i];
+                collider.enabled = collider.enabled || colliderStates[i];
+            }
+            colliderStates = null;
+        }
+
+        #endregion
+
+        #region DisableCollision
+
+        /// <summary>
+        /// Disables collisions for the item.
+        /// </summary>
+        public void DisableCollision() {
+            DisablePhysics();
+            if (colliders == null) colliders = gameObject.GetColliders(false);
+            int colliderCount = colliders.Length;
+            colliderStates = new bool[colliderCount];
+            Collider collider;
+            for (int i = colliderCount - 1; i >= 0; i--) {
+                collider = colliders[i];
+                if (collider.enabled) {
+                    colliderStates[i] = true;
+                    collider.enabled = false;
+                } else {
+                    colliderStates[i] = false;
+                }
+            }
+        }
+
+        #endregion
+
+        #region SetLayers
+
+        public void SetLayers(in int layer) {
+            if (colliders == null) colliders = gameObject.GetColliders(false);
+            int colliderCount = colliders.Length;
+            colliderLayers = new int[colliderCount];
+            GameObject colliderGameObject;
+            for (int i = colliderCount - 1; i >= 0; i--) {
+                colliderGameObject = colliders[i].gameObject;
+                colliderLayers[i] = colliderGameObject.layer;
+                colliderGameObject.layer = layer;
+            }
+        }
+
+        #endregion
+
+        #region ResetLayers
+
+        public void ResetLayers() {
+            if (colliders == null || colliderLayers == null) return;
+            GameObject colliderGameObject;
+            for (int i = colliders.Length - 1; i >= 0; i--) {
+                colliderGameObject = colliders[i].gameObject;
+                colliderGameObject.layer = colliderLayers[i];
+            }
+        }
+
+        #endregion
+
+        #region OnEnterXRItemSnapPoint
+#if ENABLE_VR
+        internal void OnEnterSnapPoint(in XRItemSnapPoint snapPoint, in SelectEnterEventArgs args) {
+            onXRItemSnapPointEnter?.Invoke(snapPoint, args);
+        }
+#endif
+        #endregion
+
+        #region OnExitXRItemSnapPoint
+#if ENABLE_VR
+        internal void OnExitSnapPoint(in XRItemSnapPoint snapPoint, in SelectExitEventArgs args) {
+            onXRItemSnapPointExit?.Invoke(snapPoint, args);
+        }
+#endif
         #endregion
 
         #endregion

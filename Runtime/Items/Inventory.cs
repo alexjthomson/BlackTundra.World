@@ -13,7 +13,7 @@ namespace BlackTundra.World.Items {
         /// Maximum length of a side of the inventory (inclusive).
         /// </summary>
         public const int MaxLength = 46340;
-        
+
         /// <summary>
         /// Maximum width (inclusive).
         /// </summary>

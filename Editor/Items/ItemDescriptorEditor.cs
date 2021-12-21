@@ -1,5 +1,6 @@
 using BlackTundra.Foundation.Editor.Utility;
 using BlackTundra.Foundation.Serialization;
+using BlackTundra.Foundation.Utility;
 using BlackTundra.World.Items;
 
 using System.Collections.Generic;
@@ -117,6 +118,49 @@ namespace BlackTundra.World.Editor.Items {
             }
             EditorLayout.EndVerticalBox();
 
+            // tags:
+            EditorLayout.Title("Tags");
+            EditorLayout.StartVerticalBox();
+            string[] tags = item.tags;
+            bool tagsModified = false;
+            if (tags == null) {
+                tags = new string[0];
+                tagsModified = true;
+            }
+            for (int i = 0; i < tags.Length; i++) {
+                EditorLayout.StartHorizontal();
+                string currentTag = tags[i];
+                string newTag = EditorLayout.TextField(currentTag);
+                if (newTag != currentTag) {
+                    tagsModified = true;
+                    tags[i] = newTag;
+                }
+                if (EditorLayout.UpButton()) {
+                    tags.Swap(i, i - 1);
+                    tagsModified = true;
+                }
+                if (EditorLayout.DownButton()) {
+                    tags.Swap(i, i + 1);
+                    tagsModified = true;
+                }
+                if (EditorLayout.XButton()) {
+                    tags = tags.RemoveAt(i);
+                    tagsModified = true;
+                    break;
+                }
+                EditorLayout.EndHorizontal();
+            }
+            if (EditorLayout.Button("Add Tag")) {
+                tags = tags.AddLast("New Tag");
+                tagsModified = true;
+            }
+            if (tagsModified) {
+                item.tags = tags;
+                MarkAsDirty(item);
+            }
+            EditorLayout.EndVerticalBox();
+
+            // finalize:
             if (EditorLayout.Button("Build Item Database")) ItemDatabaseBuilder.BuildItemDatabase();
 
         }

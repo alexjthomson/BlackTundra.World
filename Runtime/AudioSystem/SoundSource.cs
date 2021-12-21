@@ -7,8 +7,6 @@ using System;
 
 using UnityEngine;
 
-using Console = BlackTundra.Foundation.Console;
-
 namespace BlackTundra.World.Audio {
 
     public sealed class SoundSource : MonoBehaviour {
@@ -16,6 +14,8 @@ namespace BlackTundra.World.Audio {
         #region constant
 
         private const int BufferExpandSize = 8;
+
+        private static readonly ConsoleFormatter ConsoleFormatter = new ConsoleFormatter(nameof(SoundSource));
 
         #endregion
 
@@ -76,7 +76,7 @@ namespace BlackTundra.World.Audio {
                 if (remainingSpace > BufferExpandSize) {
                     int shrinkOperations = remainingSpace / BufferExpandSize; // calculate the required number of shrink operations
                     if (!buffer.TryShrink(BufferExpandSize * shrinkOperations)) { // combine shrink operations into single shrink operation
-                        Console.Error($"[SoundSource] Failed to shrink {nameof(SoundInstance)} {nameof(buffer)}.");
+                        ConsoleFormatter.Error($"Failed to shrink {nameof(SoundInstance)} {nameof(buffer)}.");
                     }
                 }
             }

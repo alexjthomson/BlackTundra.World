@@ -1,11 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-
-using BlackTundra.Foundation;
+﻿using BlackTundra.Foundation;
 using BlackTundra.Foundation.Collections.Generic;
 using BlackTundra.Foundation.Utility;
 using BlackTundra.World.Audio;
+
+using System;
+using System.Collections.Generic;
+using System.Globalization;
 
 using UnityEngine;
 using UnityEngine.AI;

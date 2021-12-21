@@ -1,10 +1,10 @@
+using BlackTundra.Foundation.Collections.Generic;
+using BlackTundra.Foundation.Control;
+using BlackTundra.Foundation.Utility;
+
 using System;
 
 using UnityEngine;
-
-using BlackTundra.Foundation.Control;
-using BlackTundra.Foundation.Collections.Generic;
-using BlackTundra.Foundation.Utility;
 
 namespace BlackTundra.World.CameraSystem {
 

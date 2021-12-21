@@ -5,7 +5,6 @@ using BlackTundra.Foundation.Serialization;
 using System;
 using System.Collections.Generic;
 
-using Console = BlackTundra.Foundation.Console;
 using Object = UnityEngine.Object;
 
 namespace BlackTundra.World.Items {
@@ -33,6 +32,8 @@ namespace BlackTundra.World.Items {
         /// </summary>
         internal const FileFormat DatabaseFormat = FileFormat.Obfuscated;
 
+        private static readonly ConsoleFormatter ConsoleFormatter = new ConsoleFormatter("ItemDatabase");
+
         #endregion
 
         #region variable
@@ -48,6 +49,11 @@ namespace BlackTundra.World.Items {
         public readonly int height;
 
         public readonly Dictionary<string, Object> resources;
+
+        /// <summary>
+        /// Tags associated with the item.
+        /// </summary>
+        public readonly string[] tags;
 
         /// <summary>
         /// Array of each <see cref="ItemData"/> entry.
@@ -72,7 +78,8 @@ namespace BlackTundra.World.Items {
             in string description,
             in int width,
             in int height,
-            in Dictionary<string, Object> resources
+            in Dictionary<string, Object> resources,
+            in string[] tags
         ) {
             if (id < 0) throw new ArgumentOutOfRangeException(nameof(id));
             if (name == null) throw new ArgumentNullException(nameof(name));
@@ -80,12 +87,14 @@ namespace BlackTundra.World.Items {
             if (width < 1 || width > MaxLength) throw new ArgumentOutOfRangeException(nameof(width));
             if (height < 1 || height > MaxLength) throw new ArgumentOutOfRangeException(nameof(height));
             if (resources == null) throw new ArgumentNullException(nameof(resources));
+            if (tags == null) throw new ArgumentNullException(nameof(tags));
             this.id = id;
             this.name = name;
             this.description = description;
             this.width = width;
             this.height = height;
             this.resources = resources;
+            this.tags = tags;
         }
 
         #endregion
@@ -100,7 +109,7 @@ namespace BlackTundra.World.Items {
             try {
                 ReloadDatabase();
             } catch (Exception exception) {
-                Core.Quit(QuitReason.FatalCrash, "Failed to initialise item database.", exception, true);
+                Core.Quit(QuitReason.FatalCrash, ConsoleFormatter.Format("Failed to initialise item database."), exception, true);
             }
         }
 
@@ -114,11 +123,10 @@ namespace BlackTundra.World.Items {
             try {
                 ReloadDatabase();
             } catch (Exception exception) {
-                UnityEngine.Debug.LogException(exception);
-                UnityEngine.Debug.LogError("Database invalid.");
+                ConsoleFormatter.Error("Database invalid.", exception);
                 return;
             }
-            UnityEngine.Debug.Log("Database valid.");
+            ConsoleFormatter.Info("Database valid.");
         }
 
 #endif
@@ -128,7 +136,7 @@ namespace BlackTundra.World.Items {
 
         private static void ReloadDatabase() {
             if (FileSystem.Read(DatabaseFSR, out byte[] database, DatabaseFormat)) {
-                Console.Info("Item database found.");
+                ConsoleFormatter.Info("Item database found.");
                 // setup to read from database:
                 SerializedByteArrayReader reader = new SerializedByteArrayReader(database);
                 int itemCount = reader.ReadNext<int>();
@@ -136,8 +144,9 @@ namespace BlackTundra.World.Items {
                 // read each entry:
                 int id;
                 string name, description, key, guid;
-                int width, height, resourceCount;
+                int width, height, resourceCount, tagCount;
                 Dictionary<string, Object> resources;
+                string[] tags;
                 for (int i = 0; i < itemCount; i++) {
                     id = reader.ReadNext<int>();
                     if (id != i) throw new Exception($"Failed to read item database entry {i} due to index mismatch.");
@@ -152,9 +161,14 @@ namespace BlackTundra.World.Items {
                         guid = reader.ReadNext<string>();
                         resources.Add(key, ItemResources.GetResource(guid));
                     }
-                    items[i] = new ItemData(id, name, description, width, height, resources);
+                    tagCount = reader.ReadNext<byte>();
+                    tags = new string[tagCount];
+                    for (int j = tagCount - 1; j >= 0; j--) {
+                        tags[j] = reader.ReadNext<string>();
+                    }
+                    items[i] = new ItemData(id, name, description, width, height, resources, tags);
                 }
-                Console.Info($"Discovered {itemCount} items.");
+                ConsoleFormatter.Info($"Discovered {itemCount} items.");
                 ItemData.items = items;
             }
         }
@@ -163,12 +177,12 @@ namespace BlackTundra.World.Items {
 
         #region GetItem
 
-        public static ItemData GetItem(in int id) {
+        internal static ItemData GetItem(in int id) {
             if (id < 0 || id >= items.Length) throw new ArgumentOutOfRangeException(nameof(id));
             return items[id];
         }
 
-        public static ItemData GetItem(in string name) {
+        internal static ItemData GetItem(in string name) {
             if (name == null) throw new ArgumentNullException(nameof(name));
             ItemData item;
             for (int i = items.Length - 1; i >= 0; i--) {

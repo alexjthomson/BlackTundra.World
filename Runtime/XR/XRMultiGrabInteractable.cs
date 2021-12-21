@@ -1,7 +1,5 @@
 #if ENABLE_VR
 
-using BlackTundra.Foundation.Collections.Generic;
-
 using System;
 
 using UnityEngine;

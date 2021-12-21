@@ -7,8 +7,6 @@ using BlackTundra.World.CameraSystem;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-using Console = BlackTundra.Foundation.Console;
-
 namespace BlackTundra.World.Player {
 
     [DisallowMultipleComponent]
@@ -39,6 +37,8 @@ namespace BlackTundra.World.Player {
         private const float SkinWidth = 0.125f;
         private const float Radius = 0.25f;
         private const float StandHeight = 1.8f;
+
+        private static readonly ConsoleFormatter ConsoleFormatter = new ConsoleFormatter(nameof(ActionBasedLocomotionController));
 
         #endregion
 
@@ -256,7 +256,7 @@ namespace BlackTundra.World.Player {
         private void UpdateCameraController() {
             cameraController = CameraController.current;
             if (cameraController == null) {
-                Console.Error($"[{nameof(ActionBasedLocomotionController)}] Failed to assign {nameof(CameraController)} instance to {nameof(cameraTarget)}.");
+                ConsoleFormatter.Error($"Failed to assign {nameof(CameraController)} instance to {nameof(cameraTarget)}.");
                 return;
             }
             cameraController.target = cameraTarget;

@@ -24,6 +24,13 @@ namespace BlackTundra.World.Items {
 
         #region property
 
+        /*
+        /// <summary>
+        /// <see cref="ItemData"/> associated with the <see cref="Item"/>.
+        /// </summary>
+        public ItemData data => ItemData.GetItem(id);
+        */
+
         /// <summary>
         /// Width of the <see cref="Item"/>.
         /// </summary>
@@ -38,6 +45,11 @@ namespace BlackTundra.World.Items {
         /// Tracks if the <see cref="Item"/> is rotated by 90 degrees or not.
         /// </summary>
         public bool rotated { get; internal set; } = false;
+
+        /// <summary>
+        /// Number of tags that the <see cref="Item"/> has.
+        /// </summary>
+        public int TagCount => ItemData.GetItem(id).tags.Length;
 
         #endregion
 
@@ -186,6 +198,92 @@ namespace BlackTundra.World.Items {
                     yield return t;
                 }
             }
+        }
+
+        #endregion
+
+        #region GetTag
+
+        /// <summary>
+        /// Gets a tag by <paramref name="index"/>.
+        /// </summary>
+        /// <seealso cref="TagCount"/>
+        /// <seealso cref="HasTag(in string)"/>
+        /// <seealso cref="IndexOfTag(in string)"/>
+        public string GetTag(in int index) {
+            if (index < 0) throw new ArgumentOutOfRangeException(nameof(index));
+            ItemData data = ItemData.GetItem(id);
+            string[] tags = data.tags;
+            int tagCount = tags.Length;
+            if (index >= tagCount) throw new ArgumentOutOfRangeException(nameof(index));
+            return tags[index];
+        }
+
+        #endregion
+
+        #region HasTag
+
+        /// <returns>
+        /// Returns <c>true</c> if the <see cref="Item"/> contains the <paramref name="tag"/>.
+        /// </returns>
+        /// <seealso cref="HasAnyTag(in string[])"/>
+        /// <seealso cref="GetTag(in int)"/>
+        /// <seealso cref="IndexOfTag(in string)"/>
+        public bool HasTag(in string tag) {
+            if (tag == null) throw new ArgumentNullException(nameof(tag));
+            ItemData data = ItemData.GetItem(id);
+            string[] tags = data.tags;
+            int tagCount = tags.Length;
+            for (int i = tagCount - 1; i >= 0; i--) {
+                if (tag.Equals(tags[i])) return true;
+            }
+            return false;
+        }
+
+        #endregion
+
+        #region HasAnyTag
+
+        /// <returns>
+        /// Returns <c>true</c> if the <see cref="Item"/> has any of the specified <paramref name="tags"/>.
+        /// </returns>
+        /// <seealso cref="HasTag(in string)"/>
+        public bool HasAnyTag(in string[] tags) {
+            if (tags == null) throw new ArgumentNullException(nameof(tags));
+            int tagCount = tags.Length;
+            if (tagCount == 0) return false;
+            ItemData data = ItemData.GetItem(id);
+            string[] itemTags = data.tags;
+            int itemTagCount = itemTags.Length;
+            string currentTag;
+            for (int i = tagCount - 1; i >= 0; i--) {
+                currentTag = tags[i];
+                if (currentTag == null) continue;
+                for (int j = itemTagCount - 1; j >= 0; j--) {
+                    if (currentTag.Equals(itemTags[j])) return true;
+                }
+            }
+            return false;
+        }
+
+        #endregion
+
+        #region IndexOfTag
+
+        /// <returns>
+        /// Returns the index of the <paramref name="tag"/>; if the <paramref name="tag"/> was not found, <c>-1</c> is returned.
+        /// </returns>
+        /// <seealso cref="GetTag(in int)"/>
+        /// <seealso cref="HasTag(in string)"/>
+        public int IndexOfTag(in string tag) {
+            if (tag == null) throw new ArgumentNullException(nameof(tag));
+            ItemData data = ItemData.GetItem(id);
+            string[] tags = data.tags;
+            int tagCount = tags.Length;
+            for (int i = tagCount - 1; i >= 0; i--) {
+                if (tag.Equals(tags[i])) return i;
+            }
+            return -1;
         }
 
         #endregion

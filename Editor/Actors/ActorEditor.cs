@@ -1,8 +1,6 @@
 using BlackTundra.Foundation.Editor.Utility;
 using BlackTundra.World.Actors;
 
-using System;
-
 using UnityEditor;
 
 using UnityEngine;

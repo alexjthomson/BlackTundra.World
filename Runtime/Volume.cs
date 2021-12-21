@@ -1,11 +1,10 @@
+using BlackTundra.Foundation;
 using BlackTundra.Foundation.Utility;
 
 using System;
 using System.Collections.Generic;
 
 using UnityEngine;
-
-using Console = BlackTundra.Foundation.Console;
 
 namespace BlackTundra.World {
 
@@ -25,6 +24,8 @@ namespace BlackTundra.World {
         /// Every <see cref="Volume"/> instance.
         /// </summary>
         private static readonly List<Volume> VolumeList = new List<Volume>();
+
+        private static readonly ConsoleFormatter ConsoleFormatter = new ConsoleFormatter(nameof(Volume));
 
         #endregion
 
@@ -184,9 +185,12 @@ namespace BlackTundra.World {
 
         private void GetCollider() {
             collider = GetComponent<Collider>();
-            if (collider == null) Console.Warning("Collider expected on non-global volume.");
+            if (collider == null) ConsoleFormatter.Warning("Collider expected on non-global volume.");
             else if (!collider.isTrigger) {
-                Console.Warning($"Volume \"{name}\" collider is not a trigger; the collider will be converted to a trigger.");
+                ConsoleFormatter.Warning($"Volume `{name}` collider is not a trigger; the collider will be converted to a trigger.");
+#if UNITY_EDITOR
+                Debug.LogWarning("Volume collider is not trigger.", collider);
+#endif
                 collider.isTrigger = true;
             }
         }

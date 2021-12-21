@@ -103,7 +103,7 @@ namespace BlackTundra.World.Actors {
         public bool IsVisibleFrom(in Vector3 point, Vector3 direction, in Collider collider) {
             if (collider == null) throw new ArgumentNullException(nameof(collider));
             if (((1 << collider.gameObject.layer) & interestMask) == 0) return false; // not in visible layer mask
-            
+
             Bounds colliderBounds = collider.bounds;
             Vector3 colliderWorldPosition = colliderBounds.center;
             Vector3 colliderLocalPosition = colliderWorldPosition - point; // convert collider position into local space

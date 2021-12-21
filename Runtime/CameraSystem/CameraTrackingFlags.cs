@@ -7,7 +7,7 @@ namespace BlackTundra.World.CameraSystem {
     /// </summary>
     [Flags]
     public enum CameraTrackingFlags : int {
-        
+
         /// <summary>
         /// Empty flag.
         /// </summary>

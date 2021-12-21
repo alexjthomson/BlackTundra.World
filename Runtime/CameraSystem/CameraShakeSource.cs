@@ -1,9 +1,9 @@
+using BlackTundra.Foundation;
+using BlackTundra.Foundation.Collections.Generic;
+
 using System;
 
 using UnityEngine;
-
-using BlackTundra.Foundation;
-using BlackTundra.Foundation.Collections.Generic;
 
 using Random = UnityEngine.Random;
 
@@ -184,7 +184,7 @@ namespace BlackTundra.World.CameraSystem {
         #endregion
 
         #region constructor
-        
+
         private CameraShakeSource(
             in float magnitude,
             in float roughness,

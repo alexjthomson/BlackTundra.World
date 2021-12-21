@@ -99,6 +99,9 @@ namespace BlackTundra.World.Editor.Items {
                 descriptor = descriptors[i];
                 SerializableDictionary<string, string> dictionary = descriptor.resources;
                 int dictionaryCount = dictionary.Count;
+                string[] tags = descriptor.tags;
+                if (tags == null) tags = new string[0];
+                int tagCount = tags.Length;
                 if (dictionaryCount >= byte.MaxValue) throw new NotSupportedException();
                 database.WriteNext(i)
                     .WriteNext(descriptor.name)
@@ -108,6 +111,10 @@ namespace BlackTundra.World.Editor.Items {
                     .WriteNext((byte)dictionaryCount);
                 foreach (KeyValuePair<string, string> kvp in dictionary) {
                     database.WriteNext(kvp.Key).WriteNext(kvp.Value);
+                }
+                database.WriteNext((byte)tagCount);
+                for (int j = tagCount - 1; j >= 0; j--) {
+                    database.WriteNext(tags[j]);
                 }
             }
             // write database to system:

@@ -69,7 +69,7 @@ namespace BlackTundra.World.XR {
 
         private Vector3 itemPositionalOffset = Vector3.zero;
         private Quaternion itemRotationalOffset = Quaternion.identity;
-        
+
         /// <summary>
         /// Array containing every <see cref="Collider"/> component attached to the <see cref="item"/>.
         /// </summary>

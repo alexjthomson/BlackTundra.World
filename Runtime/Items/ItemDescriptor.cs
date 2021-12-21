@@ -1,7 +1,5 @@
 using BlackTundra.Foundation.Serialization;
 
-using System.Collections.Generic;
-
 using UnityEngine;
 
 namespace BlackTundra.World.Items {
@@ -47,6 +45,10 @@ namespace BlackTundra.World.Items {
         /// </summary>
         [SerializeField]
         internal SerializableDictionary<string, string> resources;
+
+        /// <inheritdoc cref="ItemData.tags"/>
+        [SerializeField]
+        internal string[] tags;
 
         #endregion
 

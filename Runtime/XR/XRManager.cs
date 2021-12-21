@@ -2,17 +2,11 @@
 
 using BlackTundra.Foundation;
 using BlackTundra.Foundation.IO;
-using BlackTundra.Foundation.Utility;
-using BlackTundra.Foundation.Collections;
-
-using System;
 
 using UnityEngine;
 using UnityEngine.XR;
 using UnityEngine.XR.Management;
 
-using Object = UnityEngine.Object;
-using Console = BlackTundra.Foundation.Console;
 using Colour = BlackTundra.Foundation.ConsoleColour;
 
 namespace BlackTundra.World.XR {
@@ -25,6 +19,8 @@ namespace BlackTundra.World.XR {
         #region constant
 
         public const string XRConfigName = "xr";
+
+        private static readonly ConsoleFormatter ConsoleFormatter = new ConsoleFormatter(nameof(XRManager));
 
         #endregion
 
@@ -66,10 +62,10 @@ namespace BlackTundra.World.XR {
             set {
                 isEnabled = value;
                 if (isEnabled) {
-                    Console.Info($"[{nameof(XRManager)}] XR enabled.");
+                    ConsoleFormatter.Info($"XR enabled.");
                     XRGeneralSettings.Instance.Manager.InitializeLoader();
                 } else {
-                    Console.Info($"[{nameof(XRManager)}] XR disabled.");
+                    ConsoleFormatter.Info($"XR disabled.");
                     XRGeneralSettings.Instance.Manager.DeinitializeLoader();
                 }
             }

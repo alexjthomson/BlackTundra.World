@@ -1,7 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using BlackTundra.World.Audio;
 
-using BlackTundra.Foundation.Utility;
-using BlackTundra.World.Audio;
+using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.AI;

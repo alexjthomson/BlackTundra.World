@@ -1,7 +1,6 @@
 using BlackTundra.Foundation;
 using BlackTundra.Foundation.Serialization;
 
-using System;
 using System.Collections.Generic;
 
 using UnityEngine;
