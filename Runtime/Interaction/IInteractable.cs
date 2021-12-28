@@ -23,7 +23,7 @@
         /// <remarks>Don't call this method directly to cause interactions.</remarks>
         bool InteractStop(in object sender, in object[] parameters);
 
-#if ENABLE_VR
+#if USE_XR_TOOLKIT
 
         /// <summary>
         /// Method that can be invoked via XR when the <see cref="IInteractable"/> is selected.

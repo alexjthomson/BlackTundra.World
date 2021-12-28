@@ -1,3 +1,5 @@
+#if USE_XR_TOOLKIT
+
 using BlackTundra.World.Items;
 
 using UnityEngine;
@@ -15,16 +17,16 @@ namespace BlackTundra.World.XR {
 #endif
     public sealed class XRItemSnapPoint : XRSocketInteractor {
 
-        #region constant
+#region constant
 
         /// <summary>
         /// Max amount of time since an item was released/dropped that an <see cref="XRItemSnapPoint"/> will accept an interaction from.
         /// </summary>
         private const float MaxReleaseTimePassed = 0.1f;
 
-        #endregion
+#endregion
 
-        #region variable
+#region variable
 
         /// <summary>
         /// Item tags allowed to snap to this snap point.
@@ -44,9 +46,9 @@ namespace BlackTundra.World.XR {
         [SerializeField]
         private int selectedLayer = -1;
 
-        #endregion
+#endregion
 
-        #region logic
+#region logic
 
         public sealed override bool CanHover(XRBaseInteractable interactable) {
             if (interactable == null) return false;
@@ -91,8 +93,10 @@ namespace BlackTundra.World.XR {
             }
         }
 
-        #endregion
+#endregion
 
     }
 
 }
+
+#endif

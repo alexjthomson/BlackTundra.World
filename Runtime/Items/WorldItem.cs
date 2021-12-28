@@ -1,11 +1,11 @@
 using BlackTundra.Foundation.Utility;
-#if ENABLE_VR
+#if USE_XR_TOOLKIT
 using BlackTundra.World.XR;
 #endif
 
 using UnityEngine;
 using UnityEngine.Events;
-#if ENABLE_VR
+#if USE_XR_TOOLKIT
 using UnityEngine.XR.Interaction.Toolkit;
 #endif
 
@@ -16,7 +16,7 @@ namespace BlackTundra.World.Items {
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(Rigidbody))]
-#if ENABLE_VR
+#if USE_XR_TOOLKIT
     [RequireComponent(typeof(XRGrabInteractable))]
 #endif
     public sealed class WorldItem : MonoBehaviour {
@@ -120,12 +120,12 @@ namespace BlackTundra.World.Items {
 
         #region snap point
 
-#if ENABLE_VR
+#if USE_XR_TOOLKIT
         [SerializeField]
         private UnityEvent<XRItemSnapPoint, SelectEnterEventArgs> onXRItemSnapPointEnter = null;
 #endif
 
-#if ENABLE_VR
+#if USE_XR_TOOLKIT
         [SerializeField]
         private UnityEvent<XRItemSnapPoint, SelectExitEventArgs> onXRItemSnapPointExit = null;
 #endif
@@ -168,7 +168,7 @@ namespace BlackTundra.World.Items {
         [SerializeField]
         internal Vector3 holdRotationOffset = Vector3.zero;
 
-#if ENABLE_VR
+#if USE_XR_TOOLKIT
         /// <summary>
         /// When <c>true</c>, the XR hands will be hidden while the item is grabbed.
         /// </summary>
@@ -186,7 +186,7 @@ namespace BlackTundra.World.Items {
         /// </summary>
         private Item item = null;
 
-#if ENABLE_VR
+#if USE_XR_TOOLKIT
         /// <summary>
         /// <see cref="XRGrabInteractable"/> used to allow XR to interact with the <see cref="WorldItem"/>.
         /// </summary>
@@ -294,7 +294,7 @@ namespace BlackTundra.World.Items {
 
         private void Awake() {
             rigidbody = GetComponent<Rigidbody>();
-#if ENABLE_VR
+#if USE_XR_TOOLKIT
             xrGrabInteractable = GetComponent<XRGrabInteractable>();
 #endif
             if (item == null) {
@@ -473,7 +473,7 @@ namespace BlackTundra.World.Items {
         #endregion
 
         #region XRPickupItem
-#if ENABLE_VR
+#if USE_XR_TOOLKIT
         public void XRPickupItem() {
             XRBaseInteractor interactor = xrGrabInteractable.selectingInteractor;
             if (interactor != null) {
@@ -505,7 +505,7 @@ namespace BlackTundra.World.Items {
         #endregion
 
         #region XRReleaseItem
-#if ENABLE_VR
+#if USE_XR_TOOLKIT
         public void XRReleaseItem() {
             if (holder != null) {
                 Behaviour holderBehaviour = holder as Behaviour;
@@ -619,7 +619,7 @@ namespace BlackTundra.World.Items {
         #endregion
 
         #region OnEnterXRItemSnapPoint
-#if ENABLE_VR
+#if USE_XR_TOOLKIT
         internal void OnEnterSnapPoint(in XRItemSnapPoint snapPoint, in SelectEnterEventArgs args) {
             onXRItemSnapPointEnter?.Invoke(snapPoint, args);
         }
@@ -627,7 +627,7 @@ namespace BlackTundra.World.Items {
         #endregion
 
         #region OnExitXRItemSnapPoint
-#if ENABLE_VR
+#if USE_XR_TOOLKIT
         internal void OnExitSnapPoint(in XRItemSnapPoint snapPoint, in SelectExitEventArgs args) {
             onXRItemSnapPointExit?.Invoke(snapPoint, args);
         }

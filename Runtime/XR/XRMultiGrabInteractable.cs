@@ -1,4 +1,4 @@
-#if ENABLE_VR
+#if USE_XR_TOOLKIT
 
 using System;
 
