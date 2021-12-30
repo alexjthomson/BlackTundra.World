@@ -18,8 +18,19 @@ namespace BlackTundra.World.XR {
 
         #region constant
 
+        /// <summary>
+        /// Name of the configuration the <see cref="XRManager"/> uses.
+        /// </summary>
         public const string XRConfigName = "xr";
 
+        /// <summary>
+        /// Launch flag used to indicate the application should use XR.
+        /// </summary>
+        private const string LaunchFlag = "xr";
+
+        /// <summary>
+        /// <see cref="ConsoleFormatter"/> used by the <see cref="XRManager"/> for logging.
+        /// </summary>
         private static readonly ConsoleFormatter ConsoleFormatter = new ConsoleFormatter(nameof(XRManager));
 
         #endregion
@@ -33,6 +44,11 @@ namespace BlackTundra.World.XR {
         private static GameObject deviceSimulator = null;
 #endif
 
+        /// <summary>
+        /// Tracks if the application was launched with the XR launch flag.
+        /// </summary>
+        private static bool xrLaunchFlag = false;
+
         #endregion
 
         #region property
@@ -43,7 +59,7 @@ namespace BlackTundra.World.XR {
         /// <summary>
         /// Returns <c>true</c> when the application is ready to start using XR.
         /// </summary>
-        public static bool IsReady => isEnabled && HasDevice;
+        public static bool IsReady => isEnabled && (xrLaunchFlag || HasDevice);
 
         /// <summary>
         /// Returns <c>true</c> if an XR device has been registered with the XR system.
@@ -80,6 +96,7 @@ namespace BlackTundra.World.XR {
 
         [CoreInitialise(int.MinValue + 1)]
         private static void Initialise() {
+            xrLaunchFlag = Core.HasLaunchFlag(LaunchFlag);
             UpdateState();
         }
 
