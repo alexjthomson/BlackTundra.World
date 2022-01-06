@@ -123,7 +123,6 @@ namespace BlackTundra.World.CameraSystem {
 
         #region property
 
-        #region target
         /// <summary>
         /// Target <see cref="Transform"/> component to track.
         /// </summary>
@@ -136,12 +135,13 @@ namespace BlackTundra.World.CameraSystem {
                 _target = value;
                 if (_target != null && (trackingFlags | CameraTrackingFlags.Parent) != 0) {
                     transform.parent = _target;
+                    transform.localPosition = Vector3.zero;
+                    transform.localRotation = Quaternion.identity;
                 } else {
                     transform.parent = originalParent;
                 }
             }
         }
-        #endregion
 
         #region position
         /// <summary>
