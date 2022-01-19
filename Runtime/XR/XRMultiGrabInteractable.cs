@@ -28,23 +28,23 @@ namespace BlackTundra.World.XR {
 
         #region property
 
-        public XRBaseInteractor PrimaryInteractor {
+        public IXRSelectInteractor PrimaryInteractor {
             get => _primaryInteractor;
             private set {
                 if (_primaryInteractor == value) return;
-                if (_primaryInteractor != null) _primaryInteractor.attachTransform.localRotation = _primaryInteractorAttachRotation;
-                if (value != null) _primaryInteractorAttachRotation = value.attachTransform.localRotation;
+                if (_primaryInteractor != null) _primaryInteractor.GetAttachTransform(this).localRotation = _primaryInteractorAttachRotation;
+                if (value != null) _primaryInteractorAttachRotation = value.GetAttachTransform(this).localRotation;
                 _primaryInteractor = value;
             }
         }
-        private XRBaseInteractor _primaryInteractor = null;
+        private IXRSelectInteractor _primaryInteractor = null;
         private Quaternion _primaryInteractorAttachRotation = Quaternion.identity;
 
-        public XRBaseInteractor SecondaryInteractor {
+        public IXRSelectInteractor SecondaryInteractor {
             get => _secondaryInteractor;
             private set => _secondaryInteractor = value;
         }
-        private XRBaseInteractor _secondaryInteractor = null;
+        private IXRSelectInteractor _secondaryInteractor = null;
 
         #endregion
 
@@ -100,7 +100,7 @@ namespace BlackTundra.World.XR {
                     _primaryInteractor.transform.up
                 );
                 lookRotation *= Quaternion.Euler(0.0f, 0.0f, _primaryInteractor.transform.eulerAngles.z);
-                _primaryInteractor.attachTransform.rotation = lookRotation;
+                _primaryInteractor.GetAttachTransform(this).rotation = lookRotation;
             }
             base.ProcessInteractable(updatePhase);
         }
@@ -158,7 +158,7 @@ namespace BlackTundra.World.XR {
         #region OnSelectEntered
 
         protected sealed override void OnSelectEntered(SelectEnterEventArgs args) {
-            XRBaseInteractor interactor = args.interactor;
+            IXRSelectInteractor interactor = args.interactorObject;
             Debug.Log("EE");
             if (interactor != null) {
                 if (_primaryInteractor == null) PrimaryInteractor = interactor;
@@ -172,7 +172,7 @@ namespace BlackTundra.World.XR {
         #region OnSelectExited
 
         protected sealed override void OnSelectExited(SelectExitEventArgs args) {
-            XRBaseInteractor interactor = args.interactor;
+            IXRSelectInteractor interactor = args.interactorObject;
             if (interactor != null) {
                 if (_primaryInteractor == interactor) PrimaryInteractor = null;
                 else if (_secondaryInteractor == interactor) SecondaryInteractor = null;
@@ -184,9 +184,9 @@ namespace BlackTundra.World.XR {
 
         #region IsSelectedBy
 
-        public sealed override bool IsSelectableBy(XRBaseInteractor interactor) {
+        public sealed override bool IsSelectableBy(IXRSelectInteractor interactor) {
             if (interactor == null) throw new ArgumentNullException(nameof(interactor));
-            bool isAlreadyGrabbed = selectingInteractor != null && !selectingInteractor.Equals(interactor); // check if the interactable has already been grabbed
+            bool isAlreadyGrabbed = interactorsSelecting.Contains(interactor); // check if the interactable has already been grabbed
             return base.IsSelectableBy(interactor) && !isAlreadyGrabbed;
         }
 

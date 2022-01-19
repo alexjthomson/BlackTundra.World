@@ -921,8 +921,8 @@ namespace BlackTundra.World.Actors {
                             table[0, 5] = "Target Position";
                             table[0, 6] = "Enabled";
                             Actor actor;
-                            for (int i = actorCount; i > 0; i--) {
-                                actor = ActorBuffer[i - 1];
+                            for (int i = actorCount - 1; i >= 0; i--) {
+                                actor = ActorBuffer[i];
                                 table[i, 0] = i.ToString();
                                 table[i, 1] = actor.GetInstanceID().ToHex();
                                 table[i, 2] = actor.name;

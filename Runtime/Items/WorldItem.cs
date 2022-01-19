@@ -456,7 +456,7 @@ namespace BlackTundra.World.Items {
 
         #region PickupItem
 
-        public void PickupItem(in IItemHolder holder) {
+        public void PickupItem(in IItemHolder holder, in bool disableCollision) {
             enabled = false;
             if (this.holder != null) {
                 if (!this.holder.CanTakeItem(this, holder)) return; // item cannot be taken
@@ -465,6 +465,11 @@ namespace BlackTundra.World.Items {
             if (holder != null) {
                 this.holder = holder;
                 this.holder.OnHoldItem(this);
+            }
+            if (disableCollision) {
+                DisableCollision();
+            } else {
+                EnableCollision();
             }
             lastPickupTime = Time.time;
             onItemPickup?.Invoke();
@@ -475,11 +480,11 @@ namespace BlackTundra.World.Items {
         #region XRPickupItem
 #if USE_XR_TOOLKIT
         public void XRPickupItem() {
-            XRBaseInteractor interactor = xrGrabInteractable.selectingInteractor;
-            if (interactor != null) {
-                IItemHolder itemHolder = interactor.GetComponent<IItemHolder>();
+            IXRSelectInteractor interactor = xrGrabInteractable.GetOldestInteractorSelecting();
+            if (interactor is Behaviour interactorBehaviour) {
+                IItemHolder itemHolder = interactorBehaviour.GetComponent<IItemHolder>();
                 if (itemHolder != null) {
-                    PickupItem(itemHolder);
+                    PickupItem(itemHolder, false);
                 }
             }
         }
@@ -498,6 +503,7 @@ namespace BlackTundra.World.Items {
                     this.holder = null;
                 }
             }
+            EnableCollision();
             lastReleaseTime = Time.time;
             onItemDrop.Invoke();
         }

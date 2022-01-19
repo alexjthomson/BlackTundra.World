@@ -4,6 +4,7 @@
     "references": [
         "GUID:77b61193d6b3a4c449fc64980b211e9f",
         "GUID:75469ad4d38634e559750d17036d5f7c",
+        "GUID:dc960734dc080426fa6612f1c5fe95f3",
         "GUID:e40ba710768534012815d3193fa296cb",
         "GUID:fe685ec1767f73d42b749ea8045bfe43"
     ],
@@ -17,7 +18,7 @@
     "versionDefines": [
         {
             "name": "com.unity.xr.interaction.toolkit",
-            "expression": "1.0.0-pre.8",
+            "expression": "2.0.0-pre.6",
             "define": "USE_XR_TOOLKIT"
         }
     ],

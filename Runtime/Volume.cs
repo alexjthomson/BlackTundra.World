@@ -325,15 +325,19 @@ namespace BlackTundra.World {
             for (int i = VolumeList.Count - 1; i >= 0; i--) { // iterate each volume
                 volume = VolumeList[i]; // get the current volume
                 if ((volume.layerFlag & layerMask) == 0 || !volume.HasTag(tag)) continue; // volume not in layermask or doesn't have any of the tags
-                Vector3 closestPoint = volume.collider.ClosestPoint(point); // get the closest point on the collider to the point
-                float sqrDistance = (closestPoint - point).sqrMagnitude; // calculate the square distance from the point to the closest point
-                /* Note:
-                 * Volume doesn't do anything when `sqrDistance = sqrBlendDistance`, but we can't
-                 * use a >= comparison as sqrBlendDistance could be set to 0, in which case, the
-                 * volume would always have total influence.
-                 */
-                if (sqrDistance > volume.sqrBlendDistance) continue; // volume has no influence
-                yield return new VolumeHit(volume, point, sqrDistance); // return that this volume was hit
+                if (volume._global) {
+                    yield return new VolumeHit(volume, point, 0.0f);
+                } else {
+                    Vector3 closestPoint = volume.collider.ClosestPoint(point); // get the closest point on the collider to the point
+                    float sqrDistance = (closestPoint - point).sqrMagnitude; // calculate the square distance from the point to the closest point
+                    /* Note:
+                     * Volume doesn't do anything when `sqrDistance = sqrBlendDistance`, but we can't
+                     * use a >= comparison as sqrBlendDistance could be set to 0, in which case, the
+                     * volume would always have total influence.
+                     */
+                    if (sqrDistance > volume.sqrBlendDistance) continue; // volume has no influence
+                    yield return new VolumeHit(volume, closestPoint, sqrDistance); // return that this volume was hit
+                }
             }
         }
 
@@ -344,15 +348,19 @@ namespace BlackTundra.World {
             for (int i = VolumeList.Count - 1; i >= 0; i--) { // iterate each volume
                 volume = VolumeList[i]; // get the current volume
                 if ((volume.layerFlag & layerMask) == 0 || !volume.HasTag(tags, true)) continue; // volume not in layermask or doesn't have any of the tags
-                Vector3 closestPoint = volume.collider.ClosestPoint(point); // get the closest point on the collider to the point
-                float sqrDistance = (closestPoint - point).sqrMagnitude; // calculate the square distance from the point to the closest point
-                /* Note:
-                 * Volume doesn't do anything when `sqrDistance = sqrBlendDistance`, but we can't
-                 * use a >= comparison as sqrBlendDistance could be set to 0, in which case, the
-                 * volume would always have total influence.
-                 */
-                if (sqrDistance > volume.sqrBlendDistance) continue; // volume has no influence
-                yield return new VolumeHit(volume, point, sqrDistance); // return that this volume was hit
+                if (volume._global) {
+                    yield return new VolumeHit(volume, point, 0.0f);
+                } else {
+                    Vector3 closestPoint = volume.collider.ClosestPoint(point); // get the closest point on the collider to the point
+                    float sqrDistance = (closestPoint - point).sqrMagnitude; // calculate the square distance from the point to the closest point
+                    /* Note:
+                     * Volume doesn't do anything when `sqrDistance = sqrBlendDistance`, but we can't
+                     * use a >= comparison as sqrBlendDistance could be set to 0, in which case, the
+                     * volume would always have total influence.
+                     */
+                    if (sqrDistance > volume.sqrBlendDistance) continue; // volume has no influence
+                    yield return new VolumeHit(volume, closestPoint, sqrDistance); // return that this volume was hit
+                }
             }
         }
 
@@ -372,22 +380,28 @@ namespace BlackTundra.World {
             for (int i = VolumeList.Count - 1; i >= 0; i--) { // iterate each volume
                 volume = VolumeList[i]; // get the current volume
                 if ((volume.layerFlag & layermask) == 0 || !volume.HasTag(tag)) continue; // volume is not in layermask or doesn't have the tag
-                Vector3 closestPoint = volume.collider.ClosestPoint(point); // get the closest point on the collider to the point
-                float sqrDistance = (closestPoint - point).sqrMagnitude; // calculate the square distance from the point to the closest point
+                if (volume._global) {
+                    if (volume.weight > totalInfluence)
+                        totalInfluence = volume.weight;
+                } else {
+                    Vector3 closestPoint = volume.collider.ClosestPoint(point); // get the closest point on the collider to the point
+                    float sqrDistance = (closestPoint - point).sqrMagnitude; // calculate the square distance from the point to the closest point
 
-                /* Note:
-                 * Volume doesn't do anything when `sqrDistance = sqrBlendDistance`, but we can't
-                 * use a >= comparison as sqrBlendDistance could be set to 0, in which case, the
-                 * volume would always have total influence.
-                 */
-                if (sqrDistance > volume.sqrBlendDistance) continue; // volume has no influence
+                    /* Note:
+                     * Volume doesn't do anything when `sqrDistance = sqrBlendDistance`, but we can't
+                     * use a >= comparison as sqrBlendDistance could be set to 0, in which case, the
+                     * volume would always have total influence.
+                     */
+                    if (sqrDistance > volume.sqrBlendDistance) continue; // volume has no influence
 
-                // calculate the influence that the volume will have:
-                float influence = volume.sqrBlendDistance > 0.0f
-                    ? volume._weight * (1.0f - (sqrDistance * volume.inverseSqrBlendDistance))
-                    : volume._weight;
+                    // calculate the influence that the volume will have:
+                    float influence = volume.sqrBlendDistance > 0.0f
+                        ? volume._weight * (1.0f - (sqrDistance * volume.inverseSqrBlendDistance))
+                        : volume._weight;
 
-                if (influence > totalInfluence) totalInfluence = influence;
+                    if (influence > totalInfluence)
+                        totalInfluence = influence;
+                }
             }
             return totalInfluence;
         }
@@ -404,10 +418,14 @@ namespace BlackTundra.World {
             for (int i = VolumeList.Count - 1; i >= 0; i--) { // iterate each volume
                 volume = VolumeList[i];
                 if ((volume.layerFlag & layerMask) == 0 || !volume.HasTag(tag)) continue;
-                Vector3 closestPoint = volume.collider.ClosestPoint(point);
-                float sqrDistance = (volume.transform.position - point).sqrMagnitude;
-                if (sqrDistance > range) continue; // volume out of range
-                yield return new VolumeHit(volume, point, sqrDistance); // return that this volume was hit
+                if (volume._global) {
+                    yield return new VolumeHit(volume, point, 0.0f);
+                } else {
+                    Vector3 closestPoint = volume.collider.ClosestPoint(point);
+                    float sqrDistance = (volume.transform.position - point).sqrMagnitude;
+                    if (sqrDistance > range) continue; // volume out of range
+                    yield return new VolumeHit(volume, closestPoint, sqrDistance); // return that this volume was hit
+                }
             }
         }
 
@@ -419,10 +437,14 @@ namespace BlackTundra.World {
             for (int i = VolumeList.Count - 1; i >= 0; i--) { // iterate each volume
                 volume = VolumeList[i];
                 if ((volume.layerFlag & layerMask) == 0 || !volume.HasTag(tags, true)) continue;
-                Vector3 closestPoint = volume.collider.ClosestPoint(point);
-                float sqrDistance = (volume.transform.position - point).sqrMagnitude;
-                if (sqrDistance > range) continue; // volume out of range
-                yield return new VolumeHit(volume, point, sqrDistance); // return that this volume was hit
+                if (volume._global) {
+                    yield return new VolumeHit(volume, point, 0.0f);
+                } else {
+                    Vector3 closestPoint = volume.collider.ClosestPoint(point);
+                    float sqrDistance = (volume.transform.position - point).sqrMagnitude;
+                    if (sqrDistance > range) continue; // volume out of range
+                    yield return new VolumeHit(volume, closestPoint, sqrDistance); // return that this volume was hit
+                }
             }
         }
 

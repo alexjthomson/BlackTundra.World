@@ -144,7 +144,7 @@ namespace BlackTundra.World.Interaction.Interactors {
                         if (lastHit != null) ResetLastHit();
                         lastHit = item;
                     }
-                    if (InputPickUp()) item.PickupItem(this);
+                    if (InputPickUp()) item.PickupItem(this, true);
                     else {
                         item.SetPrimaryUseState(InputPrimaryUse());
                         item.SetSecondaryUseState(InputSecondaryUse());

@@ -30,12 +30,12 @@ namespace BlackTundra.World.Editor {
                     volume.blendDistance = newBlendDistance;
                     MarkAsDirty(volume);
                 }
-                float weight = volume.weight;
-                float newWeight = Mathf.Clamp01(EditorLayout.FloatField("Weight", weight));
-                if (weight != newWeight) {
-                    volume.weight = newWeight;
-                    MarkAsDirty(volume);
-                }
+            }
+            float weight = volume.weight;
+            float newWeight = Mathf.Clamp01(EditorLayout.FloatField("Weight", weight));
+            if (weight != newWeight) {
+                volume.weight = newWeight;
+                MarkAsDirty(volume);
             }
             tagFoldout = EditorLayout.Foldout("Tags", tagFoldout);
             if (tagFoldout) {

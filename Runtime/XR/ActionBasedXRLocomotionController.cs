@@ -6,6 +6,8 @@ using BlackTundra.Foundation.IO;
 using BlackTundra.Foundation.Utility;
 using BlackTundra.World.CameraSystem;
 
+using Unity.XR.CoreUtils;
+
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.XR.Interaction.Toolkit;
@@ -13,9 +15,9 @@ using UnityEngine.XR.Interaction.Toolkit;
 namespace BlackTundra.World.XR {
 
     [DisallowMultipleComponent]
-    [RequireComponent(typeof(XRRig))]
     [RequireComponent(typeof(CharacterController))]
 #if UNITY_EDITOR
+    [DefaultExecutionOrder(-1)]
     [AddComponentMenu("XR/XR Player Controller (Action-based)")]
 #endif
     public sealed class ActionBasedXRLocomotionController : MonoBehaviour, IControllable {
@@ -70,13 +72,19 @@ namespace BlackTundra.World.XR {
         private LayerMask layerMask = -1;
 
         /// <summary>
+        /// <see cref="Transform"/> component that describes the position of the <see cref="camera"/>.
+        /// </summary>
+        [SerializeField]
+        private Transform cameraTransform = null;
+
+        /// <summary>
         /// <see cref="Transform"/> to parent the <see cref="camera"/> to.
         /// </summary>
         /// <remarks>
-        /// This should be an additional transform inside the <see cref="XRRig.cameraGameObject"/>.
+        /// This should be a child of <see cref="cameraTransform"/>.
         /// </remarks>
         [SerializeField]
-        private Transform cameraParent = null;
+        private Transform cameraOffsetTransform = null;
 
         /// <summary>
         /// <see cref="Transform"/> to parent the hands to.
@@ -85,7 +93,25 @@ namespace BlackTundra.World.XR {
         /// This offsets the hands vertically if the eye height has to be forcibly changed to ensure the camera stays within bounds.
         /// </remarks>
         [SerializeField]
-        private Transform handParent = null;
+        private Transform handParentTransform = null;
+
+        /// <summary>
+        /// Minimum height of the <see cref="controller"/>.
+        /// </summary>
+#if UNITY_EDITOR
+        [Min(0.0f)]
+#endif
+        [SerializeField]
+        private float minHeight = 0.35f;
+
+        /// <summary>
+        /// Maximum height of the <see cref="controller"/>.
+        /// </summary>
+#if UNITY_EDITOR
+        [Min(0.01f)]
+#endif
+        [SerializeField]
+        private float maxHeight = 3.00f;
 
         /// <summary>
         /// <see cref="CameraController"/> used for XR.
@@ -101,11 +127,6 @@ namespace BlackTundra.World.XR {
         private CharacterController controller = null;
 
         /// <summary>
-        /// <see cref="CharacterControllerDriver"/> used to drive the XR <see cref="controller"/>.
-        /// </summary>
-        private CharacterControllerDriver driver = null;
-
-        /// <summary>
         /// <see cref="ContinuousMoveProviderBase"/> used for moving.
         /// </summary>
         private ContinuousMoveProviderBase moveProvider = null;
@@ -116,11 +137,9 @@ namespace BlackTundra.World.XR {
         private ContinuousTurnProviderBase turnProvider = null;
 
         /// <summary>
-        /// <see cref="XRRig"/> used for VR.
+        /// Sprint value.
         /// </summary>
-        private XRRig rig = null;
-
-        private SmoothFloat sprintAmount = new SmoothFloat(0.0f);
+        private SmoothFloat sprintAmount = 0.0f;
 
         /// <summary>
         /// <c>true</c> while being controlled.
@@ -161,9 +180,7 @@ namespace BlackTundra.World.XR {
 
         private void Awake() {
             this.ManageObjectSingleton(ref instance);
-            rig = GetComponent<XRRig>();
             controller = GetComponent<CharacterController>();
-            driver = GetComponent<CharacterControllerDriver>();
             Transform locomotion = transform.Find("LocomotionSystem");
             moveProvider = locomotion.GetComponent<ContinuousMoveProviderBase>();
             turnProvider = locomotion.GetComponent<ContinuousTurnProviderBase>();
@@ -206,7 +223,7 @@ namespace BlackTundra.World.XR {
                 Console.AssertReference(camera);
             }
             //camera.target = rig.cameraGameObject.transform;
-            camera.target = cameraParent;
+            camera.target = cameraOffsetTransform;
             camera.TrackingFlags = CameraTrackingFlags.Parent;
             camera.nearClipPlane = NearClipDistance;
         }
@@ -222,7 +239,7 @@ namespace BlackTundra.World.XR {
             UpdateInputActionReferences();
             QualitySettings.SetQualityLevel(QualitySettings.GetQualityLevel());
             QualitySettings.lodBias *= LODIncrease; // for some reason the LOD bias gets shrank while in VR
-            return ControlFlags.HideCursor | ControlFlags.LockCursor;
+            return ControlFlags.None;
         }
 
         #endregion
@@ -266,7 +283,7 @@ namespace BlackTundra.World.XR {
         private void UpdateMove(in float deltaTime) {
             sprintAmount.Apply(inputSprintAction.ReadValue<float>(), SprintSmoothing * deltaTime);
             float sprintCoefficient = Mathf.Lerp(1.0f, MoveSprintSpeedCoefficient, sprintAmount.value);
-            float heightCoefficient = Mathf.Lerp(driver.minHeight, HeightMoveSpeedDamperThreshold, controller.height) / HeightMoveSpeedDamperThreshold;
+            float heightCoefficient = Mathf.Lerp(minHeight, HeightMoveSpeedDamperThreshold, controller.height) / HeightMoveSpeedDamperThreshold;
             heightCoefficient = Mathf.Clamp(heightCoefficient * heightCoefficient, 0.1f, 1.0f);
             float moveSpeed = MoveBaseSpeed * heightCoefficient * sprintCoefficient;
             moveProvider.moveSpeed = moveSpeed;
@@ -300,8 +317,8 @@ namespace BlackTundra.World.XR {
             // calculate the actual position of the controller (taking into account center offset):
             Vector3 actualPosition = transform.TransformPoint(center.x, 0.0f, center.z); // transform the local center of the controller into a world position, this is effectively the actual position of the controller
             // get camera properties:
-            Vector3 cameraRigPosition = rig.cameraInRigSpacePos; // the camera position in rig space is synonymous with the camera position in local space relative to the transform component
-            Vector3 cameraWorldPosition = rig.cameraGameObject.transform.position; // camera position in world space
+            Vector3 cameraWorldPosition = cameraTransform.position; // camera position in world space
+            Vector3 cameraRigPosition = transform.InverseTransformPoint(cameraWorldPosition); // the camera position in rig space is synonymous with the camera position in local space relative to the rig transform component
             // calculate the vector translation that would transform the controller to the camera position:
             Vector3 controllerToCamera = new Vector3(
                 cameraWorldPosition.x - actualPosition.x,
@@ -336,7 +353,7 @@ namespace BlackTundra.World.XR {
             // calculate target height of the controller:
             float targetHeight = Mathf.Clamp( // clamping is required to prevent the controller from being extremely tall or too short
                 cameraRigPosition.y + EyeHeightOffset, // the height of the controller should be the head height plus eye height offset
-                driver.minHeight, driver.maxHeight // get lower and upper clamps from the driver
+                minHeight, maxHeight // get lower and upper clamps from the driver
             );
             // detect if there is solid geometry above the controller:
             Vector3 sphereCastPoint = new Vector3(
@@ -395,11 +412,11 @@ namespace BlackTundra.World.XR {
                 headTargetPositon.z
             );
             // set eye position:
-            cameraParent.position = eyePosition;
+            cameraOffsetTransform.position = eyePosition;
             // find the local eye position:
-            Vector3 localEyePosition = cameraParent.localPosition;
+            Vector3 localEyePosition = cameraOffsetTransform.localPosition;
             // ensure the hand parent vertical offset matches the eye offset:
-            handParent.localPosition = new Vector3(0.0f, localEyePosition.y, 0.0f);
+            handParentTransform.localPosition = new Vector3(0.0f, localEyePosition.y, 0.0f);
             // update properties:
             this.height = targetHeight;
             this.radius = actualRadius;
@@ -412,9 +429,9 @@ namespace BlackTundra.World.XR {
         private void UpdatePositionRotation() {
             Vector3 center = controller.center;
             position = transform.TransformPoint(center.x, 0.0f, center.z);
-            Quaternion cameraRotation = cameraParent.rotation;
+            Quaternion cameraRotation = cameraOffsetTransform.rotation;
             this.cameraRotation = cameraRotation;
-            cameraPosition = cameraParent.position;
+            cameraPosition = cameraOffsetTransform.position;
             Vector3 cameraEulerRotation = cameraRotation.eulerAngles;
             rotation = Quaternion.Euler(0.0f, cameraEulerRotation.y, 0.0f);
         }

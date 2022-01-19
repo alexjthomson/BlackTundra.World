@@ -52,12 +52,6 @@ namespace BlackTundra.World.Lighting {
         [SerializeField]
         private float quality = 1.0f;
 
-        /// <summary>
-        /// When <c>true</c>, this light can be culled.
-        /// </summary>
-        [SerializeField]
-        private bool useCulling = false;
-
         [SerializeField]
 #if UNITY_EDITOR
         new
