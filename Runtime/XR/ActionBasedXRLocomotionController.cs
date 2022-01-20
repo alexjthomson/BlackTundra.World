@@ -58,6 +58,18 @@ namespace BlackTundra.World.XR {
         #region variable
 
         /// <summary>
+        /// <see cref="ContinuousMoveProviderBase"/> used by the <see cref="ActionBasedXRLocomotionController"/>.
+        /// </summary>
+        [SerializeField]
+        private ContinuousMoveProviderBase continuousMoveProvider = null;
+
+        /// <summary>
+        /// <see cref="ContinuousTurnProviderBase"/> used by the <see cref="ActionBasedXRLocomotionController"/>.
+        /// </summary>
+        [SerializeField]
+        private ContinuousTurnProviderBase continuousTurnProvider = null;
+
+        /// <summary>
         /// Sprint <see cref="InputActionProperty"/>.
         /// </summary>
         [SerializeField]
@@ -127,16 +139,6 @@ namespace BlackTundra.World.XR {
         private CharacterController controller = null;
 
         /// <summary>
-        /// <see cref="ContinuousMoveProviderBase"/> used for moving.
-        /// </summary>
-        private ContinuousMoveProviderBase moveProvider = null;
-
-        /// <summary>
-        /// <see cref="ContinuousTurnProviderBase"/> used for turning.
-        /// </summary>
-        private ContinuousTurnProviderBase turnProvider = null;
-
-        /// <summary>
         /// Sprint value.
         /// </summary>
         private SmoothFloat sprintAmount = 0.0f;
@@ -167,7 +169,7 @@ namespace BlackTundra.World.XR {
             get => _turnBaseSpeed;
             set {
                 _turnBaseSpeed = Mathf.Clamp(value, 0.0f, 720.0f);
-                if (instance != null && instance.turnProvider != null) instance.turnProvider.turnSpeed = _turnBaseSpeed;
+                if (instance != null && instance.continuousTurnProvider != null) instance.continuousTurnProvider.turnSpeed = _turnBaseSpeed;
             }
         }
         private static float _turnBaseSpeed = 120.0f;
@@ -182,8 +184,6 @@ namespace BlackTundra.World.XR {
             this.ManageObjectSingleton(ref instance);
             controller = GetComponent<CharacterController>();
             Transform locomotion = transform.Find("LocomotionSystem");
-            moveProvider = locomotion.GetComponent<ContinuousMoveProviderBase>();
-            turnProvider = locomotion.GetComponent<ContinuousTurnProviderBase>();
             ResetProviders();
             UpdatePositionRotation();
         }
@@ -209,8 +209,8 @@ namespace BlackTundra.World.XR {
         #region ResetProviders
 
         private void ResetProviders() {
-            moveProvider.moveSpeed = MoveBaseSpeed;
-            turnProvider.turnSpeed = _turnBaseSpeed;
+            continuousMoveProvider.moveSpeed = MoveBaseSpeed;
+            continuousTurnProvider.turnSpeed = _turnBaseSpeed;
         }
 
         #endregion
@@ -286,7 +286,7 @@ namespace BlackTundra.World.XR {
             float heightCoefficient = Mathf.Lerp(minHeight, HeightMoveSpeedDamperThreshold, controller.height) / HeightMoveSpeedDamperThreshold;
             heightCoefficient = Mathf.Clamp(heightCoefficient * heightCoefficient, 0.1f, 1.0f);
             float moveSpeed = MoveBaseSpeed * heightCoefficient * sprintCoefficient;
-            moveProvider.moveSpeed = moveSpeed;
+            continuousMoveProvider.moveSpeed = moveSpeed;
         }
 
         #endregion

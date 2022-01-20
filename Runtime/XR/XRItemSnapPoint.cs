@@ -46,6 +46,17 @@ namespace BlackTundra.World.XR {
         [SerializeField]
         private int selectedLayer = -1;
 
+        /// <summary>
+        /// When <c>true</c>, the rotational offset of the item will be ignored when snapped to the snap point.
+        /// </summary>
+        [SerializeField]
+        private bool ignoreItemRotationalOffset = false;
+
+        /// <summary>
+        /// Local rotation of the <see cref="XRItemSnapPoint"/>.
+        /// </summary>
+        private Quaternion localRotation = Quaternion.identity;
+
         #endregion
 
         #region logic
@@ -58,6 +69,12 @@ namespace BlackTundra.World.XR {
             WorldItem worldItem = baseInteractable.GetComponent<WorldItem>();
             if (worldItem == null) return false;
             Item item = worldItem.Item;
+            if (item == null) {
+#if UNITY_EDITOR
+                Debug.LogWarning($"No item data found for world item `{worldItem.name}`.", this);
+#endif
+                return false;
+            }
             return item.HasAnyTag(allowedItemTags) && !item.HasAnyTag(disallowedItemTags) && base.CanHover(interactable);
         }
 
@@ -71,6 +88,12 @@ namespace BlackTundra.World.XR {
             WorldItem worldItem = baseInteractable.GetComponent<WorldItem>();
             if (worldItem == null) return false;
             Item item = worldItem.Item;
+            if (item == null) {
+#if UNITY_EDITOR
+                Debug.LogWarning($"No item data found for world item `{worldItem.name}`.", this);
+#endif
+                return false;
+            }
             IXRSelectInteractor interactor = interactable.GetOldestInteractorSelecting();
             XRBaseInteractor baseInteractor = interactor as XRBaseInteractor;
             return (
@@ -85,10 +108,14 @@ namespace BlackTundra.World.XR {
         #region OnSelectEntered
 
         protected sealed override void OnSelectEntered(SelectEnterEventArgs args) {
+            localRotation = attachTransform.localRotation;
             base.OnSelectEntered(args);
             if (args.interactableObject is Behaviour interactableBehaviour) {
                 WorldItem worldItem = interactableBehaviour.GetComponent<WorldItem>();
                 if (worldItem != null) {
+                    if (ignoreItemRotationalOffset) {
+                        attachTransform.localRotation = localRotation * Quaternion.Inverse(worldItem.transform.rotation) * worldItem.XRHoldTransform.rotation;
+                    }
                     if (selectedLayer != -1) worldItem.SetLayers(selectedLayer);
                     worldItem.OnEnterSnapPoint(this, args);
                 }
@@ -100,6 +127,7 @@ namespace BlackTundra.World.XR {
         #region OnSelectExited
 
         protected sealed override void OnSelectExited(SelectExitEventArgs args) {
+            attachTransform.localRotation = localRotation;
             base.OnSelectExited(args);
             if (args.interactableObject is Behaviour interactableBehaviour) {
                 WorldItem worldItem = interactableBehaviour.GetComponent<WorldItem>();

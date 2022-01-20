@@ -90,6 +90,21 @@ namespace BlackTundra.World.XR {
         /// </summary>
         private SmoothFloat gripAmount = new SmoothFloat(0.0f);
 
+        /// <summary>
+        /// Position of the hand in the previous frame.
+        /// </summary>
+        private Vector3 lastHandPosition = Vector3.zero;
+
+        /// <summary>
+        /// Position of the <see cref="item"/> before transforming it to look as if the item is where the players hands are.
+        /// </summary>
+        private Vector3 lastItemPosition = Vector3.zero;
+
+        /// <summary>
+        /// Rotation of the <see cref="item"/> before transforming it to look as if the item is where the players hands are.
+        /// </summary>
+        private Quaternion lastItemRotation = Quaternion.identity;
+
         #endregion
 
         #region logic
@@ -120,7 +135,8 @@ namespace BlackTundra.World.XR {
 
         private void Update() {
             if (handAnimator != null) {
-                gripAmount.Apply(_gripAction.ReadValue<float>(), GripAmountSmoothing * Time.deltaTime);
+                float deltaTime = Time.deltaTime;
+                gripAmount.Apply(_gripAction.ReadValue<float>(), GripAmountSmoothing * deltaTime);
                 handAnimator.SetFloat(GripAnimatorPropertyName, gripAmount.value);
             } else {
                 UpdateHands();
@@ -137,51 +153,54 @@ namespace BlackTundra.World.XR {
         #region FixedUpdate
 
         private void FixedUpdate() {
-            if (itemColliders != null && itemColliders.Length > 0) {
-                Bounds bounds = new Bounds(item.transform.position, Vector3.zero);
-                Collider itemCollider;
-                for (int i = itemColliders.Length - 1; i >= 0; i--) {
-                    itemCollider = itemColliders[i];
-                    bounds.Encapsulate(itemCollider.bounds);
-                }
-                bool collision = false; // track if collisions should be enabled or not
-                int collisionCount = Physics.OverlapBoxNonAlloc( // get the number of colliders near the item
-                    bounds.center,
-                    bounds.extents * 2.0f,
-                    physicsColliderBuffer,
-                    Quaternion.identity,
-                    itemCollisionLayerMask,
-                    QueryTriggerInteraction.Ignore
-                );
-                if (collisionCount > 0) { // there is at least one collider near the item
-                    Collider currentCollider; // store reference to current collider being evaluated
-                    for (int i = collisionCount - 1; i >= 0; i--) { // iterate colliders near the item
-                        currentCollider = physicsColliderBuffer[i]; // get the current collider near the item
-                        if (currentCollider.isTrigger) continue; // skip triggers
-                        collision = true; // enable collisions
-                        for (int j = itemColliders.Length - 1; j >= 0; j--) { // iterate each collider that is part of the item
-                            itemCollider = itemColliders[j]; // get the item collider
-                            if (currentCollider == itemCollider) { // the current near collider is part of the item
-                                collision = false; // disable collisions
-                                break; // move onto the next near collider
-                            }
-                        }
-                        if (collision) break; // collisions have remained on since the current near collider is not part of the item
+            if (item != null) {
+                if (itemColliders != null && itemColliders.Length > 0 && item.physicsCulling) {
+                    Bounds bounds = new Bounds(item.transform.position, Vector3.zero);
+                    Collider itemCollider;
+                    for (int i = itemColliders.Length - 1; i >= 0; i--) {
+                        itemCollider = itemColliders[i];
+                        bounds.Encapsulate(itemCollider.bounds);
                     }
-                }
-                if (collision != useCollisions) { // collision mode has changed
-                    useCollisions = collision;
-                    Rigidbody rigidbody = item.rigidbody;
-                    if (useCollisions) {
-                        rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
-                        rigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
-                        rigidbody.detectCollisions = true;
-                        rigidbody.isKinematic = false;
-                    } else {
-                        rigidbody.interpolation = RigidbodyInterpolation.None;
-                        rigidbody.collisionDetectionMode = CollisionDetectionMode.Discrete;
-                        rigidbody.detectCollisions = false;
-                        rigidbody.isKinematic = true;
+                    bool collision = false; // track if collisions should be enabled or not
+                    int collisionCount = Physics.OverlapBoxNonAlloc( // get the number of colliders near the item
+                        bounds.center,
+                        bounds.extents * 2.0f,
+                        physicsColliderBuffer,
+                        Quaternion.identity,
+                        itemCollisionLayerMask,
+                        QueryTriggerInteraction.Ignore
+                    );
+                    if (collisionCount > 0) { // there is at least one collider near the item
+                        Collider currentCollider; // store reference to current collider being evaluated
+                        for (int i = collisionCount - 1; i >= 0; i--) { // iterate colliders near the item
+                            currentCollider = physicsColliderBuffer[i]; // get the current collider near the item
+                            if (currentCollider.isTrigger) continue; // skip triggers
+                            collision = true; // enable collisions
+                            for (int j = itemColliders.Length - 1; j >= 0; j--) { // iterate each collider that is part of the item
+                                itemCollider = itemColliders[j]; // get the item collider
+                                if (currentCollider == itemCollider) { // the current near collider is part of the item
+                                    collision = false; // disable collisions
+                                    break; // move onto the next near collider
+                                }
+                            }
+                            if (collision) break; // collisions have remained on since the current near collider is not part of the item
+                        }
+                    }
+                    if (collision != useCollisions) { // collision mode has changed
+                        useCollisions = collision;
+                        Rigidbody rigidbody = item.rigidbody;
+                        if (useCollisions) {
+                            rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
+                            rigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
+                            rigidbody.detectCollisions = true;
+                            rigidbody.isKinematic = false;
+                            lastHandPosition = transform.position;
+                        } else {
+                            rigidbody.interpolation = RigidbodyInterpolation.None;
+                            rigidbody.collisionDetectionMode = CollisionDetectionMode.Discrete;
+                            rigidbody.detectCollisions = false;
+                            rigidbody.isKinematic = true;
+                        }
                     }
                 }
             }
@@ -192,9 +211,31 @@ namespace BlackTundra.World.XR {
         #region LateUpdate
 
         private void LateUpdate() {
-            if (item != null && !useCollisions) {
-                item.transform.rotation = transform.rotation * itemRotationalOffset;
-                item.transform.position = transform.position + (item.transform.rotation * itemPositionalOffset);
+            if (item != null) {
+                Transform itemTransform = item.transform;
+                lastItemPosition = itemTransform.position;
+                lastItemRotation = itemTransform.rotation;
+                if (useCollisions) {
+                    Vector3 currentPosition = transform.position;
+                    Vector3 deltaPosition = currentPosition - lastHandPosition;
+                    itemTransform.position = lastItemPosition + deltaPosition;
+                    lastHandPosition = currentPosition;
+                } else {
+                    itemTransform.SetPositionAndRotation(
+                        transform.position + (lastItemRotation * itemPositionalOffset),
+                        transform.rotation * itemRotationalOffset
+                    );
+                }
+            }
+        }
+
+        #endregion
+
+        #region OnPostRender
+
+        private void OnPostRender() {
+            if (item != null) {
+                item.transform.SetPositionAndRotation(lastItemPosition, lastItemRotation); // reset transform
             }
         }
 
@@ -205,10 +246,13 @@ namespace BlackTundra.World.XR {
         private void ResetItemCollision() {
             useCollisions = true;
             Rigidbody rigidbody = item.rigidbody;
-            rigidbody.interpolation = RigidbodyInterpolation.None;
-            rigidbody.collisionDetectionMode = CollisionDetectionMode.Discrete;
+            rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
+            rigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
             rigidbody.detectCollisions = true;
             rigidbody.isKinematic = false;
+            lastItemPosition = item.transform.position;
+            lastItemRotation = item.transform.rotation;
+            lastHandPosition = transform.position;
         }
 
         #endregion

@@ -63,6 +63,12 @@ namespace BlackTundra.World.Items {
         [SerializeField]
         private ItemDescriptor itemDescriptor = null;
 
+        /// <summary>
+        /// While <c>true</c>, physics will only be enabled when necessary.
+        /// </summary>
+        [SerializeField]
+        internal bool physicsCulling = true;
+
         #region primary use
 
         /// <summary>
@@ -281,6 +287,13 @@ namespace BlackTundra.World.Items {
         public Vector3 LocalHoldPosition => holdPositionOffset;
 
         public Vector3 LocalHoldRotation => holdRotationOffset;
+
+#if USE_XR_TOOLKIT
+        /// <summary>
+        /// Primary <see cref="Transform"/> component used to hold the <see cref="WorldItem"/>.
+        /// </summary>
+        public Transform XRHoldTransform => xrGrabInteractable.attachTransform;
+#endif
 
         #endregion
 

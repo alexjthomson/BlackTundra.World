@@ -16,35 +16,62 @@ namespace BlackTundra.World.XR {
     [DisallowMultipleComponent]
     public sealed class XRMultiGrabInteractable : XRGrabInteractable {
 
+        #region constant
+
+
+        #endregion
+
         #region variable
 
         /// <summary>
-        /// Additional interactable points on the <see cref="XRMultiGrabInteractable"/>.
+        /// Additional grab points.
         /// </summary>
         [SerializeField]
-        private XRBaseInteractable[] additionalInteractables = new XRBaseInteractable[0];
+        private XRBaseInteractable[] auxiliaryGrabPoints = new XRBaseInteractable[0];
 
         #endregion
 
         #region property
 
-        public IXRSelectInteractor PrimaryInteractor {
-            get => _primaryInteractor;
+        public XRBaseInteractor PrimaryInteractor {
+            get => primaryInteractor;
             private set {
-                if (_primaryInteractor == value) return;
-                if (_primaryInteractor != null) _primaryInteractor.GetAttachTransform(this).localRotation = _primaryInteractorAttachRotation;
-                if (value != null) _primaryInteractorAttachRotation = value.GetAttachTransform(this).localRotation;
-                _primaryInteractor = value;
+                if (primaryInteractor == value) return;
+                if (primaryInteractor != null) primaryInteractor.GetAttachTransform(this).localRotation = primaryInteractorAttachRotation;
+                if (value != null) {
+                    primaryInteractorAttachRotation = value.GetAttachTransform(this).localRotation;
+                    primaryInteractable = value.GetOldestInteractableSelected() as XRBaseInteractable;
+                } else {
+                    secondaryInteractable = null;
+                }
+                primaryInteractor = value;
+                if (value == secondaryInteractor) {
+                    secondaryInteractor = null;
+                }
             }
         }
-        private IXRSelectInteractor _primaryInteractor = null;
-        private Quaternion _primaryInteractorAttachRotation = Quaternion.identity;
+        private XRBaseInteractor primaryInteractor = null;
+        private XRBaseInteractable primaryInteractable = null;
+        private Quaternion primaryInteractorAttachRotation = Quaternion.identity;
 
-        public IXRSelectInteractor SecondaryInteractor {
-            get => _secondaryInteractor;
-            private set => _secondaryInteractor = value;
+        public XRBaseInteractor SecondaryInteractor {
+            get => SecondaryInteractor;
+            private set {
+                if (value != null && primaryInteractor == null) {
+                    PrimaryInteractor = value;
+                } else if (value != primaryInteractor && secondaryInteractor != value) {
+                    secondaryInteractor = value;
+                    if (value != null) {
+                        secondaryInteractable = value.GetOldestInteractableSelected() as XRBaseInteractable;
+                    } else {
+                        primaryInteractor.GetAttachTransform(this).localRotation = primaryInteractorAttachRotation;
+                        secondaryInteractable = null;
+                    }
+                }
+            }
         }
-        private IXRSelectInteractor _secondaryInteractor = null;
+        private XRBaseInteractor secondaryInteractor = null;
+        private XRBaseInteractable secondaryInteractable = null;
 
         #endregion
 
@@ -54,17 +81,15 @@ namespace BlackTundra.World.XR {
 
         protected sealed override void Awake() {
             base.Awake();
-            int additionalGrabPointCount = additionalInteractables.Length;
+            // configure grab points:
             XRBaseInteractable grabPoint;
-            for (int i = additionalGrabPointCount - 1; i >= 0; i--) {
-                grabPoint = additionalInteractables[i];
+            for (int i = auxiliaryGrabPoints.Length - 1; i >= 0; i--) {
+                grabPoint = auxiliaryGrabPoints[i];
                 if (grabPoint != null) {
-                    grabPoint.hoverEntered.AddListener(OnAdditionalGrabPointHoverEntered);
-                    grabPoint.hoverExited.AddListener(OnAdditionalGrabPointHoverExited);
-                    grabPoint.selectEntered.AddListener(OnAdditionalGrabPointSelectEntered);
-                    grabPoint.selectExited.AddListener(OnAdditionalGrabPointSelectExited);
-                    grabPoint.activated.AddListener(OnAdditionalGrabPointActivated);
-                    grabPoint.deactivated.AddListener(OnAdditionalGrabPointDeactivated);
+                    grabPoint.selectEntered.RemoveListener(OnSelectEntered);
+                    grabPoint.selectEntered.AddListener(OnSelectEntered);
+                    grabPoint.selectExited.RemoveListener(OnSelectExited);
+                    grabPoint.selectExited.AddListener(OnSelectExited);
                 }
             }
         }
@@ -75,17 +100,18 @@ namespace BlackTundra.World.XR {
 
         protected sealed override void OnDestroy() {
             base.OnDestroy();
+            // configure grab points:
             XRBaseInteractable grabPoint;
-            for (int i = additionalInteractables.Length - 1; i >= 0; i--) {
-                grabPoint = additionalInteractables[i];
+            for (int i = auxiliaryGrabPoints.Length - 1; i >= 0; i--) {
+                grabPoint = auxiliaryGrabPoints[i];
                 if (grabPoint != null) {
-                    grabPoint.hoverEntered.RemoveListener(OnAdditionalGrabPointHoverEntered);
-                    grabPoint.hoverExited.RemoveListener(OnAdditionalGrabPointHoverExited);
-                    grabPoint.selectEntered.RemoveListener(OnAdditionalGrabPointSelectEntered);
-                    grabPoint.selectExited.RemoveListener(OnAdditionalGrabPointSelectExited);
-                    grabPoint.activated.RemoveListener(OnAdditionalGrabPointActivated);
-                    grabPoint.deactivated.RemoveListener(OnAdditionalGrabPointDeactivated);
+                    grabPoint.selectEntered.RemoveListener(OnSelectEntered);
+                    grabPoint.selectExited.RemoveListener(OnSelectExited);
                 }
+            }
+            // reset primary interactor:
+            if (primaryInteractor != null) {
+                ResetPrimaryInteractor();
             }
         }
 
@@ -94,63 +120,18 @@ namespace BlackTundra.World.XR {
         #region ProcessInteractable
 
         public sealed override void ProcessInteractable(XRInteractionUpdateOrder.UpdatePhase updatePhase) {
-            if (_primaryInteractor != null && _secondaryInteractor != null) {
-                Quaternion lookRotation = Quaternion.LookRotation(
-                    _secondaryInteractor.transform.position - _primaryInteractor.transform.position,
-                    _primaryInteractor.transform.up
+            if (primaryInteractor != null && secondaryInteractor != null) {
+                Transform pivotTransform = primaryInteractor.transform;
+                Transform directionTransform = secondaryInteractor.transform;
+                Vector3 handVector = directionTransform.position - pivotTransform.position; // pivot hand -> direction hand
+                Vector3 upAxis = pivotTransform.up; // up axis to use for look rotation
+                Quaternion interactorRotation = Quaternion.LookRotation(
+                    handVector,
+                    upAxis
                 );
-                lookRotation *= Quaternion.Euler(0.0f, 0.0f, _primaryInteractor.transform.eulerAngles.z);
-                _primaryInteractor.GetAttachTransform(this).rotation = lookRotation;
+                primaryInteractor.GetAttachTransform(primaryInteractable).rotation = interactorRotation; // apply rotation
             }
             base.ProcessInteractable(updatePhase);
-        }
-
-        #endregion
-
-        #region OnAdditionalGrabPointHoverEntered
-
-        private void OnAdditionalGrabPointHoverEntered(HoverEnterEventArgs args) {
-            OnHoverEntered(args);
-        }
-
-        #endregion
-
-        #region OnAdditionalGrabPointHoverExited
-
-        private void OnAdditionalGrabPointHoverExited(HoverExitEventArgs args) {
-            OnHoverExited(args);
-        }
-
-        #endregion
-
-        #region OnAdditionalGrabPointSelectEntered
-
-        private void OnAdditionalGrabPointSelectEntered(SelectEnterEventArgs args) {
-            OnSelectEntered(args);
-        }
-
-        #endregion
-
-        #region OnAdditionalGrabPointSelectExited
-
-        private void OnAdditionalGrabPointSelectExited(SelectExitEventArgs args) {
-            OnSelectExited(args);
-        }
-
-        #endregion
-
-        #region OnAdditionalGrabPointActivated
-
-        private void OnAdditionalGrabPointActivated(ActivateEventArgs args) {
-            OnActivated(args);
-        }
-
-        #endregion
-
-        #region OnAdditionalGrabPointDeactivated
-
-        private void OnAdditionalGrabPointDeactivated(DeactivateEventArgs args) {
-            OnDeactivated(args);
         }
 
         #endregion
@@ -159,10 +140,9 @@ namespace BlackTundra.World.XR {
 
         protected sealed override void OnSelectEntered(SelectEnterEventArgs args) {
             IXRSelectInteractor interactor = args.interactorObject;
-            Debug.Log("EE");
-            if (interactor != null) {
-                if (_primaryInteractor == null) PrimaryInteractor = interactor;
-                else if (_primaryInteractor != interactor) SecondaryInteractor = interactor;
+            if (interactor != null && interactor is XRBaseInteractor baseInteractor) {
+                if (primaryInteractor == null) PrimaryInteractor = baseInteractor;
+                else if (primaryInteractor != baseInteractor) SecondaryInteractor = baseInteractor;
             }
             base.OnSelectEntered(args);
         }
@@ -173,11 +153,20 @@ namespace BlackTundra.World.XR {
 
         protected sealed override void OnSelectExited(SelectExitEventArgs args) {
             IXRSelectInteractor interactor = args.interactorObject;
-            if (interactor != null) {
-                if (_primaryInteractor == interactor) PrimaryInteractor = null;
-                else if (_secondaryInteractor == interactor) SecondaryInteractor = null;
+            if (interactor != null && interactor is XRBaseInteractor baseInteractor) {
+                if (primaryInteractor == baseInteractor) ResetPrimaryInteractor();
+                else if (primaryInteractor != baseInteractor) SecondaryInteractor = null;
             }
             base.OnSelectExited(args);
+        }
+
+        #endregion
+
+        #region ResetPrimaryInteractor
+
+        private void ResetPrimaryInteractor() {
+            primaryInteractor.GetAttachTransform(this).localRotation = primaryInteractorAttachRotation;
+            primaryInteractor = null;
         }
 
         #endregion
@@ -185,9 +174,9 @@ namespace BlackTundra.World.XR {
         #region IsSelectedBy
 
         public sealed override bool IsSelectableBy(IXRSelectInteractor interactor) {
-            if (interactor == null) throw new ArgumentNullException(nameof(interactor));
-            bool isAlreadyGrabbed = interactorsSelecting.Contains(interactor); // check if the interactable has already been grabbed
-            return base.IsSelectableBy(interactor) && !isAlreadyGrabbed;
+            return interactor != null
+                && interactor is XRBaseInteractor baseInteractor
+                && (primaryInteractor == baseInteractor || secondaryInteractor == baseInteractor || base.IsSelectableBy(interactor));
         }
 
         #endregion
