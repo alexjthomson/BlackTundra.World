@@ -38,9 +38,24 @@ namespace BlackTundra.World.XR {
         private const float GripAmountSmoothing = 10.0f;
 
         /// <summary>
+        /// Minimum percentage of the velocity of the <see cref="rigidbody"/> to transform the <see cref="rigidbody"/> by while smoothing.
+        /// </summary>
+        private const float RigidbodyMinSmoothing = 0.1f;
+
+        /// <summary>
+        /// Maximum speed that the <see cref="rigidbody"/> can travel while still having smoothing applied.
+        /// Smoothing will be applied relative to how fast the <see cref="rigidbody"/> is travelling.
+        /// </summary>
+        private const float RigidbodyThresholdSmoothingSpeed = 0.75f;
+
+        private const float RigidbodyThresholdSmoothingSqrSpeed = RigidbodyThresholdSmoothingSpeed * RigidbodyThresholdSmoothingSpeed;
+
+        private const float RigidbodySmoothingCoefficient = (1.0f - RigidbodyMinSmoothing) / RigidbodyThresholdSmoothingSpeed;
+
+        /// <summary>
         /// Minimum percentage of the velocity to transform an item by while smoothing.
         /// </summary>
-        private const float MinSmoothing = 0.1f;
+        private const float ItemMinSmoothing = 0.1f;
 
         /// <summary>
         /// Velocity that if an item is travelling at, it should have it's position smoothed.
@@ -50,17 +65,22 @@ namespace BlackTundra.World.XR {
         /// When items exceed this value, the jitter is less noticable. Smoothing will be applied more
         /// or less depending how close to this value the velocity is. This should occur linearly.
         /// </remarks>
-        private const float SmoothingThresholdVelocity = 0.75f;
+        private const float ItemSmoothingThresholdVelocity = 0.75f;
 
         /// <summary>
-        /// <see cref="SmoothingThresholdVelocity"/> squared. Constant required for optimization.
+        /// <see cref="ItemSmoothingThresholdVelocity"/> squared. Constant required for optimization.
         /// </summary>
-        private const float SmoothingThresholdSqrVelocity = SmoothingThresholdVelocity * SmoothingThresholdVelocity;
+        private const float ItemThresholdSmoothingSqrSpeed = ItemSmoothingThresholdVelocity * ItemSmoothingThresholdVelocity;
 
         /// <summary>
-        /// Coefficient to convert a velocity into a smoothing factor between <c>0.0f</c> and <c>1.0 - <see cref="MinSmoothing"/></c>.
+        /// Coefficient to convert a velocity into a smoothing factor between <c>0.0f</c> and <c>1.0 - <see cref="ItemMinSmoothing"/></c>.
         /// </summary>
-        private const float SmoothingCoefficient = (1.0f - MinSmoothing) / SmoothingThresholdVelocity;
+        private const float ItemSmoothingCoefficient = (1.0f - ItemMinSmoothing) / ItemSmoothingThresholdVelocity;
+
+        /// <summary>
+        /// Square distance between the physics hands and the non-physics hands that will result in the non-physics hands being rendered.
+        /// </summary>
+        private const float RenderNonPhysicsHandsSqrDistance = 0.1f * 0.1f;
 
         #endregion
 
@@ -116,12 +136,30 @@ namespace BlackTundra.World.XR {
         private Animator nonPhysicsAnimator = null;
 
         /// <summary>
-        /// <see cref="Rigidbody"/> component attached to the physics hand variant.
+        /// <see cref="Renderer"/> component on child of the <see cref="nonPhysicsTransform"/>.
         /// </summary>
-        private Rigidbody physicsRigidbody = null;
+        private Renderer nonPhysicsRenderer = null;
 
         /// <summary>
-        /// <see cref="Animator"/> component on the <see cref="physicsRigidbody"/>.
+        /// <see cref="Renderer"/> component on child of the <see cref="rigidbody"/>.
+        /// </summary>
+        private Renderer physicsRenderer = null;
+
+        /// <summary>
+        /// <see cref="Rigidbody"/> component attached to the physics hand variant.
+        /// </summary>
+#if UNITY_EDITOR
+        new
+#endif
+        private Rigidbody rigidbody = null;
+
+        /// <summary>
+        /// <see cref="Collider"/> array containing every collider childed to the <see cref="rigidbody"/>.
+        /// </summary>
+        private Collider[] physicsColliders = null;
+
+        /// <summary>
+        /// <see cref="Animator"/> component on the <see cref="rigidbody"/>.
         /// </summary>
         private Animator physicsAnimator = null;
 
@@ -164,7 +202,7 @@ namespace BlackTundra.World.XR {
         /// Position of the <see cref="transform"/> in the previous frame.
         /// This is used to predict where an object should be in the current frame.
         /// </summary>
-        private Vector3 lastPosition = Vector3.zero;
+        private Vector3 lastHandPosition = Vector3.zero;
 
         /// <summary>
         /// Position of the <see cref="item"/> before transforming it to look as if the item is where the player's hand is.
@@ -177,14 +215,29 @@ namespace BlackTundra.World.XR {
         private Quaternion lastItemRotation = Quaternion.identity;
 
         /// <summary>
-        /// Position of the <see cref="physicsRigidbody"/> before transforming it to look as if the hand is where the player's hand should be.
+        /// Position of the <see cref="rigidbody"/> before transforming it to look as if the hand is where the player's hand should be.
         /// </summary>
-        private Vector3 lastPhysicsHandPosition = Vector3.zero;
+        private Vector3 lastRigidbodyPosition = Vector3.zero;
 
         /// <summary>
-        /// Rotation of the <see cref="physicsRigidbody"/> before transforming it to look as if the hand is where the player's hand should be.
+        /// Rotation of the <see cref="rigidbody"/> before transforming it to look as if the hand is where the player's hand should be.
         /// </summary>
-        private Quaternion lastPhysicsHandRotation = Quaternion.identity;
+        private Quaternion lastRigidbodyRotation = Quaternion.identity;
+
+        /// <summary>
+        /// List of <see cref="XRHandCollisionTracker"/> instances.
+        /// </summary>
+        private List<XRHandCollisionTracker> collisionTrackers = new List<XRHandCollisionTracker>();
+
+        /// <summary>
+        /// When <c>true</c>, the next hand update will be skipped.
+        /// </summary>
+        /// <remarks>
+        /// Without this, a weird physics bug is introduced where the hand will teleport
+        /// far from the position it should be in. This is caused by the deltaHandPosition
+        /// vector being very large. It is unclear why this happens.
+        /// </remarks>
+        private bool skipHandUpdate = false;
 
         #endregion
 
@@ -215,11 +268,11 @@ namespace BlackTundra.World.XR {
                     parent.rotation,
                     null//parent
                 );
-                physicsRigidbody = instance.GetComponent<Rigidbody>();
-                if (physicsRigidbody == null) {
+                rigidbody = instance.GetComponent<Rigidbody>();
+                if (rigidbody == null) {
                     ConsoleFormatter.Error("No Rigidbody component found on physics hand variant instance.");
                 } else {
-                    physicsRigidbody.useGravity = false;
+                    rigidbody.useGravity = false;
                 }
                 physicsAnimator = instance.GetComponent<Animator>();
                 if (physicsAnimator == null) {
@@ -227,6 +280,11 @@ namespace BlackTundra.World.XR {
                 } else {
                     physicsAnimator.updateMode = AnimatorUpdateMode.AnimatePhysics;
                 }
+                physicsColliders = instance.GetColliders(false);
+                physicsRenderer = instance.GetComponentInChildren<Renderer>();
+            } else {
+                physicsColliders = new Collider[0];
+                physicsRenderer = null;
             }
         }
 
@@ -237,7 +295,13 @@ namespace BlackTundra.World.XR {
         private void SetupNonPhysicsHands() {
             Transform model = controller.model;
             nonPhysicsTransform = model;
-            nonPhysicsAnimator = model != null ? model.GetComponent<Animator>() : null;
+            if (model != null) {
+                nonPhysicsAnimator = model.GetComponent<Animator>();
+                nonPhysicsRenderer = model.GetComponentInChildren<Renderer>();
+            } else {
+                nonPhysicsAnimator = null;
+                nonPhysicsRenderer = null;
+            }
         }
 
         #endregion
@@ -255,6 +319,15 @@ namespace BlackTundra.World.XR {
                 item.SetSecondaryUseState(_secondaryAction.ReadValue<float>() > 0.5f);
                 item.SetTertiaryUseState(_tertiaryAction.ReadValue<float>() > 0.5f);
             }
+            if (rigidbody != null && nonPhysicsRenderer != null) {
+                if (item == null) {
+                    Vector3 deltaPosition = rigidbody.position - nonPhysicsTransform.position;
+                    float sqrDistance = deltaPosition.sqrMagnitude;
+                    nonPhysicsRenderer.enabled = sqrDistance > RenderNonPhysicsHandsSqrDistance;
+                } else { // item in hand, never show the non-physics renderer
+                    nonPhysicsRenderer.enabled = false;
+                }
+            }
         }
 
         #endregion
@@ -264,16 +337,14 @@ namespace BlackTundra.World.XR {
         private void FixedUpdate() {
             float deltaTime = Time.fixedDeltaTime;
             // update physics hand:
-            if (nonPhysicsTransform != null && physicsRigidbody != null) {
+            if (nonPhysicsTransform != null && rigidbody != null) {
                 float inverseDeltaTime = 1.0f / deltaTime;
-                Vector3 deltaPosition = nonPhysicsTransform.position - physicsRigidbody.position;
+                Vector3 deltaPosition = nonPhysicsTransform.position - rigidbody.position;
                 Vector3 velocity = deltaPosition * inverseDeltaTime;
-                physicsRigidbody.velocity = velocity;
-                Quaternion deltaRotation = nonPhysicsTransform.rotation * Quaternion.Inverse(physicsRigidbody.rotation);
+                rigidbody.velocity = velocity;
+                Quaternion deltaRotation = nonPhysicsTransform.rotation * Quaternion.Inverse(rigidbody.rotation);
                 deltaRotation.ToAngleAxis(out float deltaRotationDegrees, out Vector3 deltaRotationAngleAxis);
-                physicsRigidbody.angularVelocity = deltaRotationAngleAxis * (deltaRotationDegrees * Mathf.Deg2Rad * inverseDeltaTime);
-
-                //physicsRigidbody.angularVelocity = deltaRotation.eulerAngles * (Mathf.Deg2Rad * inverseDeltaTime);
+                rigidbody.angularVelocity = deltaRotationAngleAxis * (deltaRotationDegrees * Mathf.Deg2Rad * inverseDeltaTime);
             }
             // update item:
             if (item != null) { // item is being held
@@ -317,13 +388,29 @@ namespace BlackTundra.World.XR {
                             rigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
                             rigidbody.detectCollisions = true;
                             rigidbody.isKinematic = false;
-                            lastPosition = transform.position;
                         } else {
                             rigidbody.interpolation = RigidbodyInterpolation.None;
                             rigidbody.collisionDetectionMode = CollisionDetectionMode.Discrete;
                             rigidbody.detectCollisions = false;
                             rigidbody.isKinematic = true;
                         }
+                    }
+                }
+            }
+            int collisionTrackerCount = collisionTrackers.Count;
+            if (collisionTrackerCount > 0) {
+                XRHandCollisionTracker tracker;
+                for (int i = collisionTrackerCount - 1; i >= 0; i--) {
+                    tracker = collisionTrackers[i];
+                    if (!tracker.IsIntersecting()) {
+                        float timer = tracker.timer;
+                        if (timer > deltaTime) tracker.timer = timer - deltaTime;
+                        else {
+                            tracker.EnableCollisions();
+                            collisionTrackers.RemoveAt(i);
+                        }
+                    } else {
+                        tracker.ResetTimer();
                     }
                 }
             }
@@ -334,33 +421,59 @@ namespace BlackTundra.World.XR {
         #region LateUpdate
 
         private void LateUpdate() {
-            if (item != null) { // item being held
-                Transform itemTransform = item.transform; // get a reference to the transform component on the item being held
-                Vector3 currentItemPosition = itemTransform.position; // find the current position of the item
-                lastItemRotation = itemTransform.rotation; // update the last item rotation now since it can be used to cache the current rotation of the item
-                if (useCollisions) { // item uses collisions, special position calculations are required to make sure the item appears to follow the hand correctly
-                    // calculate hand position and translation vectors:
-                    Vector3 currentHandPosition = transform.position; // get the current position of the hand
-                    Vector3 deltaHandPosition = currentHandPosition - lastPosition; // calculate the vector from the last hand position to the current hand position
-                    Vector3 deltaItemPosition = currentItemPosition - lastItemPosition; // calculate the vector from the last item position to the current item position
-                    // calculate item velocity and smoothing:
-                    float deltaTime = Time.deltaTime; // find delta time
-                    float sqrVelocity = deltaItemPosition.sqrMagnitude / (deltaTime * deltaTime); // calculate the square velocity of the hand
-                    if (sqrVelocity > SmoothingThresholdSqrVelocity) { // velocity of the item has exceeded the smoothing velocity, do not calculate any smoothing
+            if (skipHandUpdate) { // should the update be skipped?
+                skipHandUpdate = false;
+                return;
+            }
+            // calculate timing variables:
+            float deltaTime = Time.deltaTime;
+            float inverseDeltaTime = 1.0f / deltaTime;
+            float inverseSqrDeltaTime = inverseDeltaTime * inverseDeltaTime;
+            // calculate hand position variables:
+            Vector3 currentHandPosition = transform.position; // get the position of the non-physics hand
+            Vector3 deltaHandPosition = currentHandPosition - lastHandPosition; // calculate the vector from the last hand position to the current hand position
+            lastHandPosition = currentHandPosition; // update the last hand position
+            // update physics hands:
+            if (rigidbody != null) {
+                Transform rigidbodyTransform = rigidbody.transform;
+                Vector3 currentRigidbodyPosition = rigidbodyTransform.position;
+                Vector3 deltaRigidbodyPosition = currentRigidbodyPosition - lastRigidbodyPosition;
+                lastRigidbodyRotation = rigidbodyTransform.rotation;
+                // calculate hand speed and smoothing:
+                float sqrSpeed = deltaRigidbodyPosition.sqrMagnitude * inverseSqrDeltaTime;
+                if (1==2 && sqrSpeed < RigidbodyThresholdSmoothingSqrSpeed) { // within speed that smoothing is applied at
+                    float speed = Mathf.Sqrt(sqrSpeed);
+                    float smoothingCoefficient = RigidbodyMinSmoothing + (speed * RigidbodySmoothingCoefficient);
+                    rigidbodyTransform.position = lastRigidbodyPosition + (deltaRigidbodyPosition * smoothingCoefficient) + deltaHandPosition;
+                } else { // exceeded speed that smoothing is applied
+                    rigidbodyTransform.position = currentRigidbodyPosition + deltaHandPosition;
+                }
+                lastRigidbodyPosition = currentRigidbodyPosition;
+            }
+            // update item:
+            if (item != null) {
+                Transform itemTransform = item.transform; // get reference to item transform
+                Vector3 currentItemPosition = itemTransform.position;
+                lastItemRotation = itemTransform.rotation; // update last item rotation
+                if (useCollisions) { // item uses collisions
+                    // calculate item translation vector:
+                    Vector3 deltaItemPosition = currentItemPosition - lastItemPosition; // calculate vector from last item position to current item position
+                    // calculate item speed and smoothing:
+                    float sqrSpeed = deltaItemPosition.sqrMagnitude * inverseSqrDeltaTime;
+                    if (sqrSpeed < ItemThresholdSmoothingSqrSpeed) { // within speed that smoothing is applied at
+                        float speed = Mathf.Sqrt(sqrSpeed); // calculate speed of item
+                        float smoothingCoefficient = ItemMinSmoothing + (speed * ItemSmoothingCoefficient); // calculate amount of smoothing to apply (higher number is less smoothing)
+                        itemTransform.position = lastItemPosition + (deltaItemPosition * smoothingCoefficient) + deltaHandPosition;
+                    } else { // exceeded speed that smoothing is applied
                         itemTransform.position = currentItemPosition + deltaHandPosition;
-                    } else { // the velocity of the item is less than the threshold velocity that smoothing will start to be applied at
-                        float velocity = Mathf.Sqrt(sqrVelocity); // calculate the velocity of the hand
-                        float smoothingFactor = MinSmoothing + (velocity * SmoothingCoefficient); // calculate the amount of smoothing to apply (higher number is less smoothing)
-                        itemTransform.position = lastItemPosition + (deltaHandPosition * smoothingFactor) + deltaHandPosition;
                     }
-                    lastPosition = currentHandPosition; // update the last position that the hand was in to the current position of the hand
                 } else { // item does not use collisions, no special calculations are required
                     itemTransform.SetPositionAndRotation(
                         transform.position + (lastItemRotation * itemPositionalOffset),
                         transform.rotation * itemRotationalOffset
                     );
                 }
-                lastItemPosition = currentItemPosition; // finally update the last item position
+                lastItemPosition = currentItemPosition; // finally, update last item position
             }
         }
 
@@ -369,8 +482,17 @@ namespace BlackTundra.World.XR {
         #region OnPostRender
 
         private void OnPostRender() {
+            if (rigidbody != null) {
+                rigidbody.transform.SetPositionAndRotation(
+                    lastRigidbodyPosition,
+                    lastRigidbodyRotation
+                );
+            }
             if (item != null) { // position of the current item needs to be reset
-                item.transform.SetPositionAndRotation(lastItemPosition, lastItemRotation); // reset item transform
+                item.transform.SetPositionAndRotation(
+                    lastItemPosition,
+                    lastItemRotation
+                );
             }
         }
 
@@ -380,14 +502,14 @@ namespace BlackTundra.World.XR {
 
         private void ResetItemCollision() {
             useCollisions = true;
-            Rigidbody rigidbody = item.rigidbody;
-            rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
-            rigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
-            rigidbody.detectCollisions = true;
-            rigidbody.isKinematic = false;
-            lastItemPosition = item.transform.position;
-            lastItemRotation = item.transform.rotation;
-            lastPosition = transform.position;
+            Rigidbody itemRigidbody = item.rigidbody;
+            itemRigidbody.interpolation = RigidbodyInterpolation.Interpolate;
+            itemRigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
+            itemRigidbody.detectCollisions = true;
+            itemRigidbody.isKinematic = false;
+            Transform itemTransform = item.transform;
+            lastItemPosition = itemTransform.position;
+            lastItemRotation = itemTransform.rotation;
         }
 
         #endregion
@@ -406,23 +528,53 @@ namespace BlackTundra.World.XR {
 
         #endregion
 
+        #region IgnoreCollisionWithItemCollider
+
+        private void IgnoreCollisionWithItemCollider(in Collider collider, in bool ignore) {
+            Collider physicsCollider;
+            for (int i = physicsColliders.Length - 1; i >= 0; i--) {
+                physicsCollider = physicsColliders[i];
+                Physics.IgnoreCollision(collider, physicsCollider, ignore);
+            }
+        }
+
+        #endregion
+
         #region OnHoldItem
 
         public void OnHoldItem(in WorldItem item) {
             if (item == null) throw new ArgumentNullException(nameof(item));
+            // assign item:
             this.item = item;
-            Transform model = controller.model;
-            if (model != null) model.gameObject.SetActive(!item.hideXRHands);
+            // hide physics hands:
+            if (item.hideXRHands && physicsRenderer != null) physicsRenderer.enabled = false;
+            // reset item collision:
             ResetItemCollision();
+            // check for grab interactable:
             XRGrabInteractable xrGrabInteractable = item.GetComponent<XRGrabInteractable>();
-            if (xrGrabInteractable != null && xrGrabInteractable.attachTransform != null) {
+            if (xrGrabInteractable != null && xrGrabInteractable.attachTransform != null) { // the item has a valid XR interactable
                 itemPositionalOffset = -item.transform.InverseTransformPoint(xrGrabInteractable.attachTransform.position);
                 itemRotationalOffset = Quaternion.Inverse(xrGrabInteractable.attachTransform.rotation) * item.transform.rotation;
                 List<Collider> colliderList = new List<Collider>(item.GetComponentsInChildren<Collider>());
                 Collider currentCollider;
+                bool disableCollision = true;
+                // check if item is already tracked:
+                int trackerCount = collisionTrackers.Count;
+                if (trackerCount > 0) {
+                    XRHandCollisionTracker tracker;
+                    for (int i = 0; i < trackerCount; i++) {
+                        tracker = collisionTrackers[i];
+                        if (tracker.item == item) { // item already tracked
+                            disableCollision = false;
+                            break;
+                        }
+                    }
+                }
+                // process colliders:
                 for (int i = colliderList.Count - 1; i >= 0; i--) {
                     currentCollider = colliderList[i];
                     if (currentCollider.isTrigger) colliderList.RemoveAt(i);
+                    else if (disableCollision) IgnoreCollisionWithItemCollider(currentCollider, true);
                 }
                 itemColliders = colliderList.ToArray();
                 physicsColliderBuffer = new Collider[itemColliders.Length + 1];
@@ -439,15 +591,29 @@ namespace BlackTundra.World.XR {
 
         public void OnReleaseItem(in WorldItem item) {
             if (item == null) throw new ArgumentNullException(nameof(item));
-            if (this.item != item) return;
-            Transform model = controller.model;
-            if (model != null) model.gameObject.SetActive(true);
+            if (this.item != item) return; // item released is not the held item
+            physicsRenderer.enabled = true; // re-enable physics renderer (if disabled)
+            // reset item collision:
             ResetItemCollision();
-            itemColliders = null;
+            // process item colliders:
+            if (itemColliders != null) {
+                collisionTrackers.Add(
+                    new XRHandCollisionTracker(
+                        item,
+                        itemColliders,
+                        physicsColliders
+                    )
+                );
+                itemColliders = null;
+            }
+            // reset item state:
             item.SetPrimaryUseState(false);
             item.SetSecondaryUseState(false);
             item.SetTertiaryUseState(false);
+            // remove item reference:
             this.item = null;
+            // skip hand update:
+            skipHandUpdate = true;
         }
 
         #endregion
