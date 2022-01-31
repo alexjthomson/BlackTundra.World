@@ -87,16 +87,16 @@ namespace BlackTundra.World.XR {
         /// <see cref="Transform"/> component that describes the position of the <see cref="camera"/>.
         /// </summary>
         [SerializeField]
-        private Transform cameraTransform = null;
+        private Transform headTargetTransform = null;
 
         /// <summary>
         /// <see cref="Transform"/> to parent the <see cref="camera"/> to.
         /// </summary>
         /// <remarks>
-        /// This should be a child of <see cref="cameraTransform"/>.
+        /// This should be a child of <see cref="headTargetTransform"/>.
         /// </remarks>
         [SerializeField]
-        private Transform cameraOffsetTransform = null;
+        private Transform headOffsetTransform = null;
 
         /// <summary>
         /// <see cref="Transform"/> to parent the hands to.
@@ -105,7 +105,7 @@ namespace BlackTundra.World.XR {
         /// This offsets the hands vertically if the eye height has to be forcibly changed to ensure the camera stays within bounds.
         /// </remarks>
         [SerializeField]
-        private Transform handParentTransform = null;
+        private Transform handOffsetTransform = null;
 
         /// <summary>
         /// Minimum height of the <see cref="controller"/>.
@@ -223,7 +223,7 @@ namespace BlackTundra.World.XR {
                 Console.AssertReference(camera);
             }
             //camera.target = rig.cameraGameObject.transform;
-            camera.target = cameraOffsetTransform;
+            camera.target = headOffsetTransform;
             camera.TrackingFlags = CameraTrackingFlags.Parent;
             camera.nearClipPlane = NearClipDistance;
         }
@@ -317,7 +317,7 @@ namespace BlackTundra.World.XR {
             // calculate the actual position of the controller (taking into account center offset):
             Vector3 actualPosition = transform.TransformPoint(center.x, 0.0f, center.z); // transform the local center of the controller into a world position, this is effectively the actual position of the controller
             // get camera properties:
-            Vector3 cameraWorldPosition = cameraTransform.position; // camera position in world space
+            Vector3 cameraWorldPosition = headTargetTransform.position; // camera position in world space
             Vector3 cameraRigPosition = transform.InverseTransformPoint(cameraWorldPosition); // the camera position in rig space is synonymous with the camera position in local space relative to the rig transform component
             // calculate the vector translation that would transform the controller to the camera position:
             Vector3 controllerToCamera = new Vector3(
@@ -412,11 +412,11 @@ namespace BlackTundra.World.XR {
                 headTargetPositon.z
             );
             // set eye position:
-            cameraOffsetTransform.position = eyePosition;
+            headOffsetTransform.position = eyePosition;
             // find the local eye position:
-            Vector3 localEyePosition = cameraOffsetTransform.localPosition;
+            Vector3 localEyePosition = headOffsetTransform.localPosition;
             // ensure the hand parent vertical offset matches the eye offset:
-            handParentTransform.localPosition = new Vector3(0.0f, localEyePosition.y, 0.0f);
+            handOffsetTransform.localPosition = new Vector3(0.0f, localEyePosition.y, 0.0f);
             // update properties:
             this.height = targetHeight;
             this.radius = actualRadius;
@@ -429,9 +429,9 @@ namespace BlackTundra.World.XR {
         private void UpdatePositionRotation() {
             Vector3 center = controller.center;
             position = transform.TransformPoint(center.x, 0.0f, center.z);
-            Quaternion cameraRotation = cameraOffsetTransform.rotation;
+            Quaternion cameraRotation = headOffsetTransform.rotation;
             this.cameraRotation = cameraRotation;
-            cameraPosition = cameraOffsetTransform.position;
+            cameraPosition = headOffsetTransform.position;
             Vector3 cameraEulerRotation = cameraRotation.eulerAngles;
             rotation = Quaternion.Euler(0.0f, cameraEulerRotation.y, 0.0f);
         }

@@ -10,14 +10,34 @@
     "world",
     "path",
     "road",
-	"sky",
-	"environment",
-	"weather",
-	"time"
+    "sky",
+    "environment",
+    "weather",
+    "time"
   ],
   "author": {
     "name": "Black Tundra",
     "email": "contact@blacktundra.com",
     "url": "https://blacktundra.com"
-  }
+  },
+  "dependencies": {
+    "com.blacktundra.foundation": "2.0.1"
+  },
+  "samples": [
+    {
+      "displayName": "Audio Mixer",
+      "description": "Pre-configured AudioMixer resource.",
+      "path": "Samples~/AudioMixer"
+    },
+	{
+      "displayName": "Camera Controller",
+      "description": "Pre-made camera controller prefab.",
+      "path": "Samples~/CameraController"
+    },
+	{
+      "displayName": "XR Controller",
+      "description": "Fully setup XR controller.",
+      "path": "Samples~/XRController"
+    }
+  ]
 }

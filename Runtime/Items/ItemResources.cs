@@ -47,7 +47,9 @@ namespace BlackTundra.World.Items {
             if (instance == null) {
                 ResourceReference<ItemResources> resource = new ResourceReference<ItemResources>(ResourcePath);
                 instance = resource.Value;
-                if (instance == null) instance = new ItemResources();
+                if (instance == null) {
+                    instance = CreateInstance<ItemResources>();
+                }
             }
         }
 

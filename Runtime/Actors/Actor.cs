@@ -698,6 +698,84 @@ namespace BlackTundra.World.Actors {
 
         #endregion
 
+        #region DistanceTo
+
+        /// <summary>
+        /// Calculates the distance between the <see cref="Actor"/> instance and a <paramref name="point"/>.
+        /// </summary>
+        /// <param name="point">
+        /// Point in world-space to calculate the distance to. This point should be able to be navigated to on the <see cref="NavMesh"/>
+        /// that the <see cref="NavMeshAgent"/> uses.
+        /// </param>
+        /// <returns>
+        /// Returns the distance between the <see cref="Actor"/> and the <paramref name="point"/>. If a path between the <see cref="Actor"/>
+        /// and the <paramref name="point"/> cannot be calculated, <see cref="float.PositiveInfinity"/> is returned.
+        /// </returns>
+        public float DistanceTo(in Vector3 point) {
+            if (agent.CalculatePath(point, calculationPathInstance)) { // calculate path to point
+                Vector3[] points = calculationPathInstance.corners;
+                if (points.Length > 1) {
+                    float distance = 0.0f;
+                    for (int i = points.Length - 1; i >= 1;) {
+                        distance += (points[i] - points[--i]).magnitude;
+                    }
+                    return distance;
+                } else { // only one corner; therefore, distance between actor and point must be zero
+                    return 0.0f;
+                }
+            } else { // path to point cannot be calculated
+                return float.PositiveInfinity;
+            }
+        }
+
+        #endregion
+
+        #region IsWithinRangeOfPoint
+
+        /// <summary>
+        /// Calculates if a <paramref name="point"/> is within <paramref name="range"/> from the <see cref="Actor"/>.
+        /// </summary>
+        /// <param name="point">
+        /// Point to calculate range from the <see cref="Actor"/>. This point should exist on the <see cref="NavMesh"/> that the
+        /// <see cref="NavMeshAgent"/> uses.
+        /// </param>
+        /// <param name="range">Distance that the <paramref name="point"/> should fall within for the condition to be <c>true</c>.</param>
+        /// <returns>
+        /// Returns <c>true</c> if the <paramref name="point"/> is within the specified <paramref name="range"/> from the
+        /// <see cref="Actor"/> and if the <paramref name="point"/> is on the <see cref="NavMesh"/> that the <see cref="NavMeshAgent"/>
+        /// uses.
+        /// </returns>
+        public bool IsWithinRangeOfPoint(in Vector3 point, in float range) {
+            if (range < 0.0f) throw new ArgumentOutOfRangeException(nameof(range));
+            float sqrRange = range * range;
+            Vector3 actorPosition = transform.position; // position of the actor
+            // check XZ distance:
+            float dx = point.x - actorPosition.x;
+            float dz = point.z - actorPosition.z;
+            float sqrXZDistance = (dx * dx) + (dz * dz);
+            if (sqrXZDistance > sqrRange) return false; // outside of range
+            // check XYZ distance:
+            float dy = point.y - actorPosition.y;
+            float sqrDistance = sqrXZDistance + (dy * dy);
+            if (sqrDistance > sqrRange) return false; // outside of range
+            // generate path:
+            if (agent.CalculatePath(point, calculationPathInstance)) {
+                Vector3[] points = calculationPathInstance.corners;
+                if (points.Length > 1) {
+                    float distance = 0.0f;
+                    for (int i = points.Length - 1; i >= 1;) {
+                        distance += (points[i] - points[--i]).magnitude;
+                        if (distance > range) return false; // path length greater than range range
+                    }
+                }
+                return true; // all checks passed
+            } else { // cannot calculate path to point; therefore, point is not in range
+                return false;
+            }
+        }
+
+        #endregion
+
         #region IsWithinRangeOfTarget
 
         /// <summary>
@@ -706,16 +784,19 @@ namespace BlackTundra.World.Actors {
         /// <returns>Returns <c>true</c> if the <see cref="Actor"/> is within the specified <paramref name="range"/> of the <see cref="TargetPosition"/>.</returns>
         public bool IsWithinRangeOfTarget(in float range) {
             if (range < 0.0f) throw new ArgumentOutOfRangeException(nameof(range));
-            Vector3 actorPosition = transform.position;
             Vector3 targetPosition = targetCollider != null ? targetCollider.transform.position : this.targetPosition;
-            float x = targetPosition.x - actorPosition.x;
-            float z = targetPosition.z - actorPosition.z;
-            float sqrXZDistance = (x * x) + (z * z);
             float sqrRange = range * range;
+            Vector3 actorPosition = transform.position; // position of the actor
+            // check XZ distance:
+            float dx = targetPosition.x - actorPosition.x;
+            float dz = targetPosition.z - actorPosition.z;
+            float sqrXZDistance = (dx * dx) + (dz * dz);
             if (sqrXZDistance > sqrRange) return false; // outside of range
-            float y = targetPosition.y - actorPosition.y;
-            float sqrDistance = sqrXZDistance + (y * y);
+            // check XYZ distance:
+            float dy = targetPosition.y - actorPosition.y;
+            float sqrDistance = sqrXZDistance + (dy * dy);
             if (sqrDistance > sqrRange) return false; // outside of range
+            // check path:
             NavMeshPath agentPath = agent.path;
             if (agentPath == null) return true; // within distance of target
             Vector3[] points = agentPath.corners;

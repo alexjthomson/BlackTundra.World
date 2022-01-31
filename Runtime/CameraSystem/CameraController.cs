@@ -123,6 +123,8 @@ namespace BlackTundra.World.CameraSystem {
 
         #region property
 
+        #region target
+
         /// <summary>
         /// Target <see cref="Transform"/> component to track.
         /// </summary>
@@ -142,6 +144,8 @@ namespace BlackTundra.World.CameraSystem {
                 }
             }
         }
+
+        #endregion
 
         #region position
         /// <summary>
