@@ -1,3 +1,5 @@
+#if USE_XR_TOOLKIT
+
 using BlackTundra.Foundation.Utility;
 using BlackTundra.World.Items;
 
@@ -69,3 +71,5 @@ namespace BlackTundra.World.XR {
     }
 
 }
+
+#endif

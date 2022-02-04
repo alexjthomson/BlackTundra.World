@@ -63,12 +63,6 @@ namespace BlackTundra.World.Items {
         [SerializeField]
         private ItemDescriptor itemDescriptor = null;
 
-        /// <summary>
-        /// While <c>true</c>, physics will only be enabled when necessary.
-        /// </summary>
-        [SerializeField]
-        internal bool physicsCulling = true;
-
         #region primary use
 
         /// <summary>
