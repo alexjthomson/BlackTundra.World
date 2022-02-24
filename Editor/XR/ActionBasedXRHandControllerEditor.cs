@@ -10,11 +10,11 @@ using UnityEngine.XR.Interaction.Toolkit;
 
 namespace BlackTundra.World.Editor.XR {
 
-    [CustomEditor(typeof(ActionBasedXRHandController))]
+    [CustomEditor(typeof(XRHandController))]
     public sealed class ActionBasedXRHandControllerEditor : CustomInspector {
 
         protected sealed override void DrawInspector() {
-            ActionBasedXRHandController handController = (ActionBasedXRHandController)target;
+            XRHandController handController = (XRHandController)target;
             // component check:
             ActionBasedController actionBasedController = handController.GetComponent<ActionBasedController>();
             if (actionBasedController == null) {

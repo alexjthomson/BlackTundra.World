@@ -1,6 +1,8 @@
 using BlackTundra.Foundation.Utility;
 #if USE_XR_TOOLKIT
 using BlackTundra.World.XR;
+
+using System;
 #endif
 
 using UnityEngine;
@@ -8,6 +10,8 @@ using UnityEngine.Events;
 #if USE_XR_TOOLKIT
 using UnityEngine.XR.Interaction.Toolkit;
 #endif
+
+using Random = UnityEngine.Random;
 
 namespace BlackTundra.World.Items {
 
@@ -541,7 +545,7 @@ namespace BlackTundra.World.Items {
                 updateSkipCounter = UpdateSkipCount;
                 enabled = true;
                 rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
-                rigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+                rigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
                 rigidbody.isKinematic = false;
             }
         }
@@ -555,8 +559,8 @@ namespace BlackTundra.World.Items {
             rigidbody.isKinematic = true;
             rigidbody.interpolation = RigidbodyInterpolation.None;
             rigidbody.collisionDetectionMode = CollisionDetectionMode.Discrete;
-            rigidbody.velocity = Vector3.zero;
-            rigidbody.angularVelocity = Vector3.zero;
+            //rigidbody.velocity = Vector3.zero;
+            //rigidbody.angularVelocity = Vector3.zero;
             lastStablePosition = rigidbody.position;
             lastStableRotation = rigidbody.rotation;
             enabled = false;
@@ -574,6 +578,17 @@ namespace BlackTundra.World.Items {
                 collider.enabled = collider.enabled || colliderStates[i];
             }
             colliderStates = null;
+        }
+
+        public void EnableCollision(SelectExitEventArgs selectEnterEventArgs) {
+            if (selectEnterEventArgs == null) throw new ArgumentNullException(nameof(selectEnterEventArgs));
+            IXRSelectInteractable selectInteractable = selectEnterEventArgs.interactableObject;
+            Component component = selectInteractable as Component;
+            if (component != null) {
+                GameObject gameObject = component.gameObject;
+                Collider[] targetColliders = UnityUtility.GetColliders(gameObject, false);
+                SetIgnoreCollision(targetColliders, true);
+            }
         }
 
         #endregion
@@ -596,6 +611,41 @@ namespace BlackTundra.World.Items {
                     collider.enabled = false;
                 } else {
                     colliderStates[i] = false;
+                }
+            }
+        }
+
+        public void DisableCollision(SelectEnterEventArgs selectEnterEventArgs) {
+            if (selectEnterEventArgs == null) throw new ArgumentNullException(nameof(selectEnterEventArgs));
+            IXRSelectInteractable selectInteractable = selectEnterEventArgs.interactableObject;
+            Component component = selectInteractable as Component;
+            if (component != null) {
+                GameObject gameObject = component.gameObject;
+                Collider[] targetColliders = UnityUtility.GetColliders(gameObject, false);
+                SetIgnoreCollision(targetColliders, false);
+            }
+        }
+
+        #endregion
+
+        #region SetIgnoreCollision
+
+        /// <summary>
+        /// Sets the ignore collision state for the <paramref name="targetColliders"/> to the value of the <paramref name="ignore"/> parameter.
+        /// </summary>
+        private void SetIgnoreCollision(in Collider[] targetColliders, in bool ignore) {
+            if (targetColliders == null) throw new ArgumentNullException(nameof(targetColliders));
+            int targetColliderCount = targetColliders.Length;
+            if (targetColliderCount == 0) return;
+            Collider targetCollider;
+            int itemColliderCount = colliders.Length;
+            if (itemColliderCount == 0) return;
+            Collider itemCollider;
+            for (int i = targetColliderCount - 1; i >= 0; i--) {
+                targetCollider = targetColliders[i];
+                for (int j = itemColliderCount - 1; j >= 0; j--) {
+                    itemCollider = colliders[j];
+                    Physics.IgnoreCollision(itemCollider, targetCollider, ignore);
                 }
             }
         }

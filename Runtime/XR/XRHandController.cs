@@ -81,6 +81,24 @@ namespace BlackTundra.World.XR {
         GameObject physicsModelPrefab = null;
 
         /// <summary>
+        /// Scalar used for the velocity based physics-hand tracking.
+        /// </summary>
+#if UNITY_EDITOR
+        [Min(0.0f)]
+#endif
+        [SerializeField]
+        private float velocityScale = 1.0f;
+
+        /// <summary>
+        /// Scalar used for the angular velocity based physics-hand tracking.
+        /// </summary>
+#if UNITY_EDITOR
+        [Min(0.0f)]
+#endif
+        [SerializeField]
+        private float angularVelocityScale = 1.0f;
+
+        /// <summary>
         /// Layermask used to detect objects that an item can collide with.
         /// This is used to switch between smooth item modes.
         /// </summary>
@@ -164,11 +182,6 @@ namespace BlackTundra.World.XR {
         private Collider[] physicsColliderBuffer = new Collider[0];
 
         /// <summary>
-        /// Tracks if the item should collide with things or use smooth movement instead.
-        /// </summary>
-        private bool useCollisions = false;
-
-        /// <summary>
         /// Smooth grip amount.
         /// </summary>
         private SmoothFloat gripAmount = new SmoothFloat(0.0f);
@@ -188,16 +201,6 @@ namespace BlackTundra.World.XR {
         /// Rotation of the <see cref="item"/> before transforming it to look as if the item is where the player's hand is.
         /// </summary>
         private Quaternion lastItemRotation = Quaternion.identity;
-
-        /// <summary>
-        /// Position of the <see cref="rigidbody"/> before transforming it to look as if the hand is where the player's hand should be.
-        /// </summary>
-        private Vector3 lastRigidbodyPosition = Vector3.zero;
-
-        /// <summary>
-        /// Rotation of the <see cref="rigidbody"/> before transforming it to look as if the hand is where the player's hand should be.
-        /// </summary>
-        private Quaternion lastRigidbodyRotation = Quaternion.identity;
 
         /// <summary>
         /// List of <see cref="XRHandCollisionTracker"/> instances.
@@ -322,7 +325,7 @@ namespace BlackTundra.World.XR {
                 Vector3 deltaPosition = targetPosition - actualPosition;
                 Vector3 velocity = deltaPosition * inverseDeltaTime;
                 if (!float.IsNaN(velocity.x)) {
-                    rigidbody.velocity = velocity;
+                    rigidbody.velocity = velocity * velocityScale;
                 }
                 // angular velocity tracking:
                 Quaternion targetRotation = transform.rotation;
@@ -333,7 +336,7 @@ namespace BlackTundra.World.XR {
                 if (Mathf.Abs(angleDegrees) > Mathf.Epsilon) {
                     Vector3 angularVelocity = axis * (angleDegrees * Mathf.Deg2Rad * inverseDeltaTime);
                     if (!float.IsNaN(angularVelocity.x)) {
-                        rigidbody.angularVelocity = angularVelocity;
+                        rigidbody.angularVelocity = angularVelocity * angularVelocityScale;
                     }
                 }
             }
@@ -359,15 +362,15 @@ namespace BlackTundra.World.XR {
 
         #endregion
 
-        #region InternalVisualUpdate
+        #region LateUpdate
 
-        internal void InternalVisualUpdate(in CharacterController controller, in float deltaTime) {
+        private void LateUpdate() {
             if (skipHandUpdate) { // skip the current update
                 skipHandUpdate = false;
                 return;
             }
             // calculate timing variables:
-            //float deltaTime = Time.deltaTime; // delta time
+            float deltaTime = Time.deltaTime; // delta time
             float inverseSqrDeltaTime = 1.0f / (deltaTime * deltaTime); // inverse delta time squared
             // calculate hand movement vector:
             Vector3 position = transform.position; // get the position of the non-physics hand
@@ -390,13 +393,6 @@ namespace BlackTundra.World.XR {
         #region OnPostRender
 
         private void OnPostRender() {
-            // reset physics hands position:
-            if (rigidbody != null) {
-                rigidbody.transform.SetPositionAndRotation(
-                    lastRigidbodyPosition,
-                    lastRigidbodyRotation
-                );
-            }
             // reset item position:
             if (item != null) {
                 item.transform.SetPositionAndRotation(
@@ -446,10 +442,9 @@ namespace BlackTundra.World.XR {
         #region ResetItemCollision
 
         private void ResetItemCollision() {
-            useCollisions = true;
             Rigidbody itemRigidbody = item.rigidbody;
             itemRigidbody.interpolation = RigidbodyInterpolation.Interpolate;
-            itemRigidbody.collisionDetectionMode = CollisionDetectionMode.Continuous;
+            itemRigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             itemRigidbody.detectCollisions = true;
             itemRigidbody.isKinematic = false;
             Transform itemTransform = item.transform;

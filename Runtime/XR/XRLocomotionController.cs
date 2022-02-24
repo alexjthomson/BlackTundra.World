@@ -572,16 +572,6 @@ namespace BlackTundra.World.XR {
 
         #endregion
 
-        #region LateUpdate
-
-        private void LateUpdate() {
-            float deltaTime = Time.deltaTime;
-            if (leftHand != null) leftHand.InternalVisualUpdate(controller, deltaTime);
-            if (rightHand != null) rightHand.InternalVisualUpdate(controller, deltaTime);
-        }
-
-        #endregion
-
         #region UpdateHandPhysics
 
         private void UpdateHandPhysics(in float deltaTime) {
