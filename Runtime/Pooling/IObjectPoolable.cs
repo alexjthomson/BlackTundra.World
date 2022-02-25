@@ -18,15 +18,15 @@ namespace BlackTundra.World.Pooling {
         /// <summary>
         /// Invoked when the object is released from the <see cref="ObjectPool"/>.
         /// </summary>
-        void OnRelease(in ObjectPool objectPool);
+        void OnPoolRelease(in ObjectPool objectPool);
 
         /// <summary>
         /// Invoked when the <see cref="ObjectPool"/> managing this object is disposed.
         /// </summary>
         /// <remarks>
-        /// If the object is being used by the pool, <see cref="OnRelease(in ObjectPool)"/> will not first be invoked.
+        /// If the object is being used by the pool, <see cref="OnPoolRelease(in ObjectPool)"/> will not first be invoked.
         /// </remarks>
-        void Dispose(in ObjectPool objectPool);
+        void OnPoolDispose(in ObjectPool objectPool);
 
     }
 

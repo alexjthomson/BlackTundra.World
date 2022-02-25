@@ -11,6 +11,7 @@ namespace BlackTundra.World.Ballistics {
     /// <summary>
     /// Models a projectile.
     /// </summary>
+    [Serializable]
     public sealed class Projectile : IObjectPoolable {
 
         #region constant
@@ -39,20 +40,33 @@ namespace BlackTundra.World.Ballistics {
         /// <summary>
         /// <see cref="ProjectileProperties"/> that describe the <see cref="Projectile"/>.
         /// </summary>
-        private ProjectileProperties _properties;
+        [SerializeField]
+#if UNITY_EDITOR
+        internal
+#else
+        private
+#endif
+        ProjectileProperties _properties;
 
         /// <summary>
         /// <see cref="ProjectileSimulationFlags"/> used to toggle <see cref="Projectile"/> simulation features on or off.
         /// </summary>
+        [SerializeField]
         public ProjectileSimulationFlags simulationFlags;
 
-        private float _lifetime;
-        private Vector3 _position;
-        private Vector3 _velocity;
+        [NonSerialized]
+        internal float _lifetime;
+
+        [NonSerialized]
+        internal Vector3 _position;
+
+        [NonSerialized]
+        internal Vector3 _velocity;
 
         /// <summary>
         /// <see cref="ObjectPool"/> that manages the <see cref="Projectile"/>.
         /// </summary>
+        [NonSerialized]
         private ObjectPool parentPool;
 
         #endregion
@@ -350,9 +364,9 @@ namespace BlackTundra.World.Ballistics {
 
         #endregion
 
-        #region OnRelease
+        #region OnPoolRelease
 
-        public void OnRelease(in ObjectPool objectPool) {
+        public void OnPoolRelease(in ObjectPool objectPool) {
             if (objectPool == null) throw new ArgumentNullException(nameof(objectPool));
             if (parentPool == objectPool) {
                 parentPool = null;
@@ -361,9 +375,9 @@ namespace BlackTundra.World.Ballistics {
 
         #endregion
 
-        #region Dispose
+        #region OnPoolDispose
 
-        public void Dispose(in ObjectPool objectPool) {
+        public void OnPoolDispose(in ObjectPool objectPool) {
             if (objectPool == null) throw new ArgumentNullException(nameof(objectPool));
             if (parentPool == objectPool) {
                 parentPool = null;

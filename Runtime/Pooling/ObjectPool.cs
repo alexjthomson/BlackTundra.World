@@ -248,7 +248,7 @@ namespace BlackTundra.World.Pooling {
         public bool ReturnToPool(in IObjectPoolable obj) {
             if (obj == null) throw new ArgumentNullException(nameof(obj));
             if (activeBuffer.Remove(obj) > 0) {
-                obj.OnRelease(this);
+                obj.OnPoolRelease(this);
                 return true;
             }
             return false;
@@ -265,7 +265,7 @@ namespace BlackTundra.World.Pooling {
             for (int i = count - 1; i >= 0; i--) {
                 obj = buffer[i];
                 try {
-                    obj.Dispose(this);
+                    obj.OnPoolDispose(this);
                 } catch (Exception exception) {
                     exception.Handle();
                 }

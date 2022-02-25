@@ -62,9 +62,43 @@ namespace BlackTundra.World.XR {
         /// </summary>
         private const float RenderNonPhysicsHandsSqrDistance = 0.1f * 0.1f;
 
+        /// <summary>
+        /// Threshold distance between the physics hand and the target hand position for pushing to occur.
+        /// </summary>
+        private const float ThresholdPushDistance = 0.005f;
+
+        /// <summary>
+        /// <see cref="ThresholdPushDistance"/> squared.
+        /// </summary>
+        private const float ThresholdSqrPushDistance = ThresholdPushDistance * ThresholdPushDistance;
+
         #endregion
 
         #region variable
+
+        /// <summary>
+        /// Reference to the <see cref="XRLocomotionController"/> responsible for moving the XR player.
+        /// </summary>
+        [SerializeField]
+        private XRLocomotionController locomotionController = null;
+
+        /// <summary>
+        /// Scalar that controls how much force the hand exerts on the player when colliding with a surface.
+        /// </summary>
+#if UNITY_EDITOR
+        [Min(0.0f)]
+#endif
+        [SerializeField]
+        private float pushForceCoefficient = 5000.0f;
+
+        /// <summary>
+        /// Maximum distance between the physics hand and the actual hand position that will be converted into a pushing force.
+        /// </summary>
+#if UNITY_EDITOR
+        [Min(ThresholdPushDistance)]
+#endif
+        [SerializeField]
+        private float maxPushHandDistance = 0.2f;
 
         /// <summary>
         /// Prefab to use for a physics model for the hand.
@@ -104,6 +138,14 @@ namespace BlackTundra.World.XR {
         /// </summary>
         [SerializeField]
         private LayerMask itemCollisionLayerMask = -1;
+
+        [SerializeField]
+        private InputActionProperty positionAction;
+        private InputAction _positionAction = null;
+
+        [SerializeField]
+        private InputActionProperty rotationAction;
+        private InputAction _rotationAction = null;
 
         [SerializeField]
         private InputActionProperty primaryAction;
@@ -225,12 +267,62 @@ namespace BlackTundra.World.XR {
 
         private void Awake() {
             controller = GetComponent<ActionBasedController>();
-            _primaryAction = primaryAction.action;     // xrcontroller/activate
-            _secondaryAction = secondaryAction.action; // xrcontroller/primary button
-            _tertiaryAction = tertiaryAction.action;   // xrcontroller/secondary button
-            _gripAction = gripAction.action;           // xrcontroller/select
             SetupPhysicsHands();
             SetupNonPhysicsHands();
+        }
+
+        #endregion
+
+        #region OnEnable
+
+        private void OnEnable() {
+            EnableInput();
+        }
+
+        #endregion
+
+        #region OnDisable
+
+        private void OnDisable() {
+            DisableInput();
+        }
+
+        #endregion
+
+        #region EnableInput
+
+        private void EnableInput() {
+            // xrcontroller/position:
+            _positionAction = positionAction.action;
+            _positionAction?.Enable();
+            // xrcontroller/rotation:
+            _rotationAction = rotationAction.action;
+            _rotationAction?.Enable();
+            // xrcontroller/activate:
+            _primaryAction = primaryAction.action;
+            _primaryAction?.Enable();
+            // xrcontroller/primary button:
+            _secondaryAction = secondaryAction.action;
+            _secondaryAction?.Enable();
+            // xrcontroller/secondary button:
+            _tertiaryAction = tertiaryAction.action;
+            _tertiaryAction?.Enable();
+            // xrcontroller/select:
+            _gripAction = gripAction.action;
+            _gripAction?.Enable();
+        }
+
+        #endregion
+
+        #region DisableInput
+
+        private void DisableInput() {
+            _positionAction?.Enable();
+            _rotationAction?.Enable();
+            _primaryAction?.Enable();
+            _secondaryAction?.Enable();
+            _tertiaryAction?.Enable();
+            _gripAction?.Enable();
         }
 
         #endregion
@@ -287,6 +379,9 @@ namespace BlackTundra.World.XR {
 
         private void Update() {
             float deltaTime = Time.deltaTime;
+            // apply position and rotation:
+            transform.localPosition = _positionAction.ReadValue<Vector3>();
+            transform.localRotation = _rotationAction.ReadValue<Quaternion>();
             // apply grip:
             gripAmount.Apply(_gripAction.ReadValue<float>(), GripAmountSmoothing * deltaTime);
             if (physicsAnimator != null) physicsAnimator.SetFloat(GripAnimatorPropertyName, gripAmount.value);
@@ -338,6 +433,15 @@ namespace BlackTundra.World.XR {
                     if (!float.IsNaN(angularVelocity.x)) {
                         rigidbody.angularVelocity = angularVelocity * angularVelocityScale;
                     }
+                }
+                // push force:
+                float deltaPositionSqrDistance = deltaPosition.sqrMagnitude; // find the square distance between where the hand is and where it should be
+                if (deltaPositionSqrDistance > ThresholdSqrPushDistance) { // this distance is greater than 5cm, apply a force
+                    float deltaPositionDistance = Mathf.Sqrt(deltaPositionSqrDistance); // calculate the distance between the physics hand and the target hand position
+                    float actualDistance = Mathf.Min(deltaPositionDistance, maxPushHandDistance) - ThresholdPushDistance; // remove the threshold push distance from the total distance
+                    // calucalte the push force:
+                    Vector3 pushForce = deltaPosition * (-pushForceCoefficient * actualDistance / deltaPositionDistance); // normalize the push direction and apply coefficients
+                    locomotionController.AddForce(pushForce, ForceMode.Force); // apply force to the locomotion controller
                 }
             }
             // update collision trackers:

@@ -25,7 +25,7 @@ namespace BlackTundra.World.XR {
     [RequireComponent(typeof(CharacterController))]
 #if UNITY_EDITOR
     [DefaultExecutionOrder(-1)]
-    [AddComponentMenu("XR/XR Player Controller (Action-based)")]
+    [AddComponentMenu("XR/Locomotion Controller")]
 #endif
     public sealed class XRLocomotionController : MonoBehaviour, IControllable {
 
@@ -256,14 +256,14 @@ namespace BlackTundra.World.XR {
             get => _dragAir;
             set => _dragAir = Mathf.Max(value, 0.0f);
         }
-        private static float _dragAir = 0.1f;
+        private static float _dragAir = 0.5f;
 
         [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.physics.drag.ground", 0.5f)]
         private static float DragGround {
             get => _dragGround;
             set => _dragGround = Mathf.Max(value, 0.0f);
         }
-        private static float _dragGround = 0.5f;
+        private static float _dragGround = 25.0f;
 
         // move:
 
@@ -612,14 +612,15 @@ namespace BlackTundra.World.XR {
             physicsTimeDependentDeltaVelocity = Vector3.zero; // reset time based velocity
             // environmental physics:
             if (_grounded) {
-                float dragCoefficient = 1.0f - (_dragAir * deltaTime);
+                if (physicsVelocity.y > 0.0f && physicsInstantVelocity.y < 0.0f) physicsInstantVelocity.y = 0.0f; // remove instant negative y velocity
+                float dragCoefficient = 1.0f - (_dragGround * deltaTime);
                 physicsVelocity *= dragCoefficient;
                 if (physicsVelocity.y < 0.0f) physicsVelocity.y = 0.0f; // do not allow downwards velocity while grounded
             } else {
                 float dragCoefficient = -_dragAir * deltaTime;
                 physicsVelocity += new Vector3(
                     physicsVelocity.x * dragCoefficient,
-                    (physicsVelocity.y * dragCoefficient) + (_gravity * deltaTime),
+                    (physicsVelocity.y * dragCoefficient) - (Environment.gravity * deltaTime),
                     physicsVelocity.z * dragCoefficient
                 );
             }
