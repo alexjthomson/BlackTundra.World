@@ -33,6 +33,12 @@ namespace BlackTundra.World.Ballistics {
         /// </summary>
         private const float PenetrationDistanceCoefficient = 0.0125f;
 
+        /// <summary>
+        /// Percentage of energy that is transferred into kinetic energy.
+        /// The rest of the energy is assumed to be turned into heat and sound.
+        /// </summary>
+        private const float ProjectileEnergyTransferEfficiency = 0.1f;
+
         #endregion
 
         #region variable
@@ -313,16 +319,22 @@ namespace BlackTundra.World.Ballistics {
             Collider collider = hit.collider;
             // transfer momentum:
             if ((simulationFlags & ProjectileSimulationFlags.TransferMomentum) != 0) { // flag set
-                WorldItem item = collider.GetComponentInParent<WorldItem>(); // check if the hit collider is an item
-                if (item != null) { // target collider is an item
-                    item.EnablePhysics();
-                    Rigidbody rigidbody = item.rigidbody;
-                    Vector3 deltaVelocity = CalculateVelocity(energyTransferred, 1.0f / rigidbody.mass, direction);
-                    rigidbody.AddForceAtPosition(deltaVelocity, hit.point, ForceMode.VelocityChange);
+                IPhysicsObject physicsObject = collider.GetComponentInParent<IPhysicsObject>(); // check if the hit collider is a physics object
+                if (physicsObject != null) { // target collider is an item
+                    Vector3 deltaVelocity = CalculateVelocity(
+                        energyTransferred * ProjectileEnergyTransferEfficiency,
+                        1.0f / physicsObject.mass,
+                        direction
+                    );
+                    physicsObject.AddForceAtPosition(deltaVelocity, hit.point, ForceMode.VelocityChange);
                 } else { // target collider is not an item
                     Rigidbody rigidbody = collider.GetComponentInParent<Rigidbody>(); // check if the target item has a rigidbody
                     if (rigidbody != null && !rigidbody.isKinematic) { // the target item does have a rididbody
-                        Vector3 deltaVelocity = CalculateVelocity(energyTransferred, 1.0f / rigidbody.mass, direction);
+                        Vector3 deltaVelocity = CalculateVelocity(
+                            energyTransferred * ProjectileEnergyTransferEfficiency,
+                            1.0f / rigidbody.mass,
+                            direction
+                        );
                         rigidbody.AddForceAtPosition(deltaVelocity, hit.point, ForceMode.VelocityChange);
                     }
                 }

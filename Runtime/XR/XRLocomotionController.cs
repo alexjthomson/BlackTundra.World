@@ -1,6 +1,5 @@
 #if USE_XR_TOOLKIT
 
-using BlackTundra.Foundation;
 using BlackTundra.Foundation.Control;
 using BlackTundra.Foundation.IO;
 using BlackTundra.Foundation.Utility;
@@ -27,7 +26,7 @@ namespace BlackTundra.World.XR {
     [DefaultExecutionOrder(-1)]
     [AddComponentMenu("XR/Locomotion Controller")]
 #endif
-    public sealed class XRLocomotionController : MonoBehaviour, IControllable {
+    public sealed class XRLocomotionController : MonoBehaviour, IControllable, IPhysicsObject {
 
         #region constant
 
@@ -68,6 +67,12 @@ namespace BlackTundra.World.XR {
         /// <see cref="XRTurnController"/> responsible for turning the <see cref="XRLocomotionController"/>.
         /// </summary>
         private XRTurnController turnController = null;
+
+        /// <summary>
+        /// Toggles if the <see cref="XRLocomotionController"/> should use gravity.
+        /// </summary>
+        [SerializeField]
+        private bool useGravity = true;
 
         /// <summary>
         /// Move <see cref="InputActionProperty"/>.
@@ -158,7 +163,7 @@ namespace BlackTundra.World.XR {
         internal float maxHeight = 3.00f;
 
         [SerializeField]
-        private UnityAction onImpactGround = null;
+        private UnityAction<Vector3> onImpactGround = null;
 
         [SerializeField]
         private UnityAction onLeaveGround = null;
@@ -222,6 +227,8 @@ namespace BlackTundra.World.XR {
 
         public Vector3 position { get; private set; } = Vector3.zero;
         public Quaternion rotation { get; private set; } = Quaternion.identity;
+        public Vector3 velocity => controller.velocity;
+        public Vector3 centreOfMass { get; private set; }
         public Vector3 HeadPosition { get; private set; } = Vector3.zero;
         public Quaternion HeadRotation { get; private set; } = Quaternion.identity;
         public float height => _height;
@@ -234,13 +241,14 @@ namespace BlackTundra.World.XR {
         // physics:
 
         [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.physics.mass", 80.0f)]
-        private static float Mass {
+        private static float __Mass {
             get => _mass;
             set {
                 _mass = Mathf.Max(1.0f, value);
                 _inverseMass = 1.0f / _mass;
             }
         }
+        public float mass => _mass;
         private static float _mass = 80.0f;
         private static float _inverseMass = 1.0f / 80.0f;
 
@@ -354,6 +362,16 @@ namespace BlackTundra.World.XR {
             set => _continuousMoveSprintCoefficient = Mathf.Clamp(value, 1.0f, 10.0f);
         }
         internal static float _continuousMoveSprintCoefficient = 2.0f;
+
+        /// <summary>
+        /// Jump velocity.
+        /// </summary>
+        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.move.continuous.jump_velocity", 3.5f)]
+        private static float ContinuousMoveJumpVelocity {
+            get => _continuousMoveJumpVelocity;
+            set => _continuousMoveJumpVelocity = Mathf.Max(value, 0.0f);
+        }
+        internal static float _continuousMoveJumpVelocity = 3.5f;
 
         // turn:
 
@@ -592,13 +610,16 @@ namespace BlackTundra.World.XR {
                     onGroundedStateChanged.Invoke(grounded);
                 }
                 if (_grounded) { // stuck to ground
-                    physicsInstantVelocity = new Vector3(
-                        0.0f,
-                        MaxGroundedDownwardDeltaHeightRate,
-                        0.0f
-                    );
+                    if (useGravity) {
+                        physicsInstantVelocity = new Vector3(
+                            0.0f,
+                            MaxGroundedDownwardDeltaHeightRate,
+                            0.0f
+                        );
+                    }
+                    // invoke impact ground callback:
                     if (onImpactGround != null) {
-                        onImpactGround.Invoke();
+                        onImpactGround.Invoke(controller.velocity);
                     }
                 } else { // left ground
                     physicsInstantVelocity = Vector3.zero;
@@ -618,11 +639,15 @@ namespace BlackTundra.World.XR {
                 if (physicsVelocity.y < 0.0f) physicsVelocity.y = 0.0f; // do not allow downwards velocity while grounded
             } else {
                 float dragCoefficient = -_dragAir * deltaTime;
-                physicsVelocity += new Vector3(
-                    physicsVelocity.x * dragCoefficient,
-                    (physicsVelocity.y * dragCoefficient) - (Environment.gravity * deltaTime),
-                    physicsVelocity.z * dragCoefficient
-                );
+                if (useGravity) {
+                    physicsVelocity += new Vector3(
+                        physicsVelocity.x * dragCoefficient,
+                        physicsVelocity.y * dragCoefficient - (Environment.gravity * deltaTime),
+                        physicsVelocity.z * dragCoefficient
+                    );
+                } else {
+                    physicsVelocity *= 1.0f + dragCoefficient;
+                }
             }
         }
 
@@ -646,8 +671,6 @@ namespace BlackTundra.World.XR {
         /// Updates the <see cref="controller"/> to match with the position of the XR eyes (camera).
         /// </summary>
         private void UpdateCharacterController(in float deltaTime) {
-            // apply velocity:
-            ApplyVelocity(deltaTime);
             // get controller properties:
             float height = controller.height;
             float radius = controller.radius;
@@ -763,6 +786,8 @@ namespace BlackTundra.World.XR {
             // update properties:
             _height = targetHeight;
             _radius = actualRadius;
+            // apply velocity:
+            ApplyVelocity(deltaTime);
         }
 
         #endregion
@@ -770,8 +795,9 @@ namespace BlackTundra.World.XR {
         #region UpdatePositionRotation
 
         private void UpdatePositionRotation() {
-            Vector3 center = controller.center;
-            position = transform.TransformPoint(center.x, 0.0f, center.z);
+            Vector3 centre = controller.center;
+            position = transform.TransformPoint(centre.x, 0.0f, centre.z);
+            centreOfMass = centre;
             Quaternion headRotation = headOffsetTransform.rotation;
             HeadRotation = headRotation;
             HeadPosition = headOffsetTransform.position;
@@ -837,6 +863,25 @@ namespace BlackTundra.World.XR {
                     break;
                 }
             }
+        }
+
+        #endregion
+
+        #region AddForceAtPosition
+
+        public void AddForceAtPosition(in Vector3 force, in Vector3 position, in ForceMode forceMode) => AddForce(force, forceMode);
+
+        #endregion
+
+        #region AddExplosionForce
+
+        public void AddExplosionForce(in float force, in Vector3 point, in float radius, float upwardsModifier = 0.0f, in ForceMode forceMode = ForceMode.Force) {
+            if (radius < 0.0f) throw new ArgumentException(nameof(radius) + " cannot be negative.");
+            Vector3 explosionVector = centreOfMass - point;
+            float sqrDistance = explosionVector.sqrMagnitude;
+            if (sqrDistance > radius * radius) return;
+            explosionVector.y += upwardsModifier;
+            AddForce(force * (1.0f - (1.0f / radius)) * explosionVector, forceMode);
         }
 
         #endregion

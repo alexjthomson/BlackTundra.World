@@ -20,14 +20,19 @@ namespace BlackTundra.World {
             Collider[] colliders = Physics.OverlapSphere(point, radius, layerMask);
             int colliderCount = colliders.Length;
             if (colliderCount > 0) {
+                Collider collider;
                 Rigidbody rigidbody;
-                WorldItem item;
+                IPhysicsObject physicsObject;
                 for (int i = colliderCount - 1; i >= 0; i--) {
-                    rigidbody = colliders[i].GetComponent<Rigidbody>();
-                    if (rigidbody != null) {
-                        item = rigidbody.GetComponent<WorldItem>();
-                        if (item != null) item.EnablePhysics();
-                        rigidbody.AddExplosionForce(force, point, radius);
+                    collider = colliders[i];
+                    physicsObject = collider.GetComponent<IPhysicsObject>();
+                    if (physicsObject != null) {
+                        physicsObject.AddExplosionForce(force, point, radius);
+                    } else {
+                        rigidbody = collider.GetComponent<Rigidbody>();
+                        if (rigidbody != null) {
+                            rigidbody.AddExplosionForce(force, point, radius);
+                        }
                     }
                 }
             }

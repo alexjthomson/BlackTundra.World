@@ -23,7 +23,7 @@ namespace BlackTundra.World.Items {
 #if USE_XR_TOOLKIT
     [RequireComponent(typeof(XRGrabInteractable))]
 #endif
-    public sealed class WorldItem : MonoBehaviour {
+    public sealed class WorldItem : MonoBehaviour, IPhysicsObject {
 
         #region constant
 
@@ -243,6 +243,16 @@ namespace BlackTundra.World.Items {
         #endregion
 
         #region property
+
+        public Vector3 velocity => rigidbody.velocity;
+
+        public Vector3 position => rigidbody.position;
+
+        public Quaternion rotation => rigidbody.rotation;
+
+        public float mass => rigidbody.mass;
+
+        public Vector3 centreOfMass => rigidbody.centerOfMass;
 
         /// <summary>
         /// <see cref="Rigidbody"/> component attached to the <see cref="WorldItem"/> <see cref="GameObject"/>.
@@ -695,6 +705,33 @@ namespace BlackTundra.World.Items {
             onXRItemSnapPointExit?.Invoke(snapPoint, args);
         }
 #endif
+        #endregion
+
+        #region AddForce
+
+        public void AddForce(in Vector3 force, in ForceMode forceMode) {
+            EnablePhysics();
+            rigidbody.AddForce(force, forceMode);
+        }
+
+        #endregion
+
+        #region AddForceAtPosition
+
+        public void AddForceAtPosition(in Vector3 force, in Vector3 position, in ForceMode forceMode) {
+            EnablePhysics();
+            rigidbody.AddForceAtPosition(force, position, forceMode);
+        }
+
+        #endregion
+
+        #region AddExplosionForce
+
+        public void AddExplosionForce(in float force, in Vector3 point, in float radius, float upwardsModifier = 0.0f, in ForceMode forceMode = ForceMode.Force) {
+            EnablePhysics();
+            rigidbody.AddExplosionForce(force, point, radius, upwardsModifier, forceMode);
+        }
+
         #endregion
 
         #endregion

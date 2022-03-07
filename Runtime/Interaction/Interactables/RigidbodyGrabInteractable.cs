@@ -114,7 +114,14 @@ namespace BlackTundra.World.Interaction.Interactables {
             if (sender is Behaviour behaviour) {
                 senderTransform = behaviour.transform;
                 Vector3 forward = senderTransform.forward;
-                targetDistance = Vector3.Distance(MathsUtility.ClosestPointOnLine(rigidbody.position, senderTransform.position, senderTransform.position + forward), senderTransform.position);
+                targetDistance = Vector3.Distance(
+                    MathsUtility.ClosestPointOnInfiniteLine(
+                        senderTransform.position,
+                        forward,
+                        rigidbody.position
+                    ),
+                    senderTransform.position
+                );
                 enabled = true;
                 if (onInteract != null) onInteract.Invoke(true, behaviour, parameters);
                 if (onInteractStart != null) onInteractStart.Invoke();

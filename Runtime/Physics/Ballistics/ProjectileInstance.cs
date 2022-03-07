@@ -83,6 +83,10 @@ namespace BlackTundra.World.Ballistics {
         private void FixedUpdate() {
             float deltaTime = Time.fixedDeltaTime;
             projectile.Simulate(deltaTime);
+            if (projectile._lifetime < 0.0f) {
+                enabled = false;
+                return;
+            }
             UpdateTransform();
             updateLineRenderer = true;
         }
@@ -106,6 +110,7 @@ namespace BlackTundra.World.Ballistics {
         public void SetStartParameters(in Vector3 position, in Vector3 direction, in float kineticEnergy) {
             projectile.SetStartParameters(position, direction, kineticEnergy);
             UpdateTransform();
+            enabled = true;
         }
 
         #endregion

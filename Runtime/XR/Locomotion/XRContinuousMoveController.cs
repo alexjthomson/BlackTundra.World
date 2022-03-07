@@ -21,6 +21,8 @@ namespace BlackTundra.World.XR.Locomotion {
 
         private const float StrafeSpeedCoefficient = 0.7f;
 
+        private const float JumpCooldownTime = 0.1f;
+
         #endregion
 
         #region variable
@@ -36,6 +38,9 @@ namespace BlackTundra.World.XR.Locomotion {
 
         private SmoothFloat sprintCoefficient;
 
+        private float jumpCooldownTimer = 0.0f;
+        private bool jumpPressed = false;
+
         #endregion
 
         #region constructor
@@ -45,6 +50,7 @@ namespace BlackTundra.World.XR.Locomotion {
             jumpAction = locomotion.inputJumpAction;
             sprintAction = locomotion.inputSprintAction;
             sprintCoefficient = 0.0f;
+            jumpCooldownTimer = 0.0f;
         }
 
         #endregion
@@ -64,6 +70,15 @@ namespace BlackTundra.World.XR.Locomotion {
         #region FixedUpdate
 
         protected internal sealed override void FixedUpdate(in float deltaTime) {
+            // jump cooldown timer:
+            if (jumpCooldownTimer != 0.0f) {
+                if (jumpCooldownTimer > deltaTime) {
+                    jumpCooldownTimer -= deltaTime;
+                } else {
+                    jumpCooldownTimer = 0.0f;
+                }
+            }
+            // movement:
             // height:
             float heightCoefficient = Mathf.Lerp(locomotion.minHeight, HeightMoveSpeedDamperThreshold, locomotion.height) / HeightMoveSpeedDamperThreshold;
             heightCoefficient = Mathf.Clamp(heightCoefficient * heightCoefficient, 0.1f, 1.0f);
@@ -84,6 +99,17 @@ namespace BlackTundra.World.XR.Locomotion {
             );
             // set move velocity:
             locomotion.SetMoveVelocity(moveVelocity);
+            // jump:
+            if (inputJump > 0.5f) {
+                if (locomotion.grounded && !jumpPressed && jumpCooldownTimer == 0.0f) {
+                    Vector3 jumpVelocity = new Vector3(0.0f, XRLocomotionController._continuousMoveJumpVelocity, 0.0f);
+                    locomotion.AddForce(jumpVelocity, ForceMode.VelocityChange);
+                    jumpCooldownTimer = JumpCooldownTime;
+                }
+                jumpPressed = true;
+            } else {
+                jumpPressed = false;
+            }
         }
 
         #endregion
