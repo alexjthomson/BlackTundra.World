@@ -317,25 +317,34 @@ namespace BlackTundra.World.Ballistics {
 
         private void RegisterHit(in RaycastHit hit, in Vector3 direction, in ProjectileHitType hitType, in float energyTransferred) {
             Collider collider = hit.collider;
+            // impact:
+            IImpactable impactable = collider.GetComponentInParent<IImpactable>(); // check if the object is impactable
+            if (impactable != null) { // object is impactable
+                impactable.OnImpact( // impact the object
+                    _velocity,
+                    hit.point,
+                    energyTransferred
+                );
+            }
             // transfer momentum:
             if ((simulationFlags & ProjectileSimulationFlags.TransferMomentum) != 0) { // flag set
                 IPhysicsObject physicsObject = collider.GetComponentInParent<IPhysicsObject>(); // check if the hit collider is a physics object
                 if (physicsObject != null) { // target collider is an item
-                    Vector3 deltaVelocity = CalculateVelocity(
+                    Vector3 impactForce = CalculateVelocity(
                         energyTransferred * ProjectileEnergyTransferEfficiency,
                         1.0f / physicsObject.mass,
                         direction
                     );
-                    physicsObject.AddForceAtPosition(deltaVelocity, hit.point, ForceMode.VelocityChange);
+                    physicsObject.AddForceAtPosition(impactForce, hit.point, ForceMode.VelocityChange);
                 } else { // target collider is not an item
                     Rigidbody rigidbody = collider.GetComponentInParent<Rigidbody>(); // check if the target item has a rigidbody
                     if (rigidbody != null && !rigidbody.isKinematic) { // the target item does have a rididbody
-                        Vector3 deltaVelocity = CalculateVelocity(
+                        Vector3 impactForce = CalculateVelocity(
                             energyTransferred * ProjectileEnergyTransferEfficiency,
                             1.0f / rigidbody.mass,
                             direction
                         );
-                        rigidbody.AddForceAtPosition(deltaVelocity, hit.point, ForceMode.VelocityChange);
+                        rigidbody.AddForceAtPosition(impactForce, hit.point, ForceMode.VelocityChange);
                     }
                 }
             }

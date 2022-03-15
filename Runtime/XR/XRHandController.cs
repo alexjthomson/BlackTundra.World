@@ -17,15 +17,16 @@ namespace BlackTundra.World.XR {
     /// Manages an XR hand.
     /// </summary>
     [DisallowMultipleComponent]
+    [RequireComponent(typeof(XRRayInteractor))]
     [RequireComponent(typeof(ActionBasedController))]
 #if UNITY_EDITOR
     [AddComponentMenu("XR/XR Hand Controller (Action-based)")]
 #endif
-    public sealed class XRHandController : MonoBehaviour, IItemHolder {
+    public /*sealed*/ class XRHandController : MonoBehaviour, IItemHolder {
 
         #region constant
 
-        private static readonly ConsoleFormatter ConsoleFormatter = new ConsoleFormatter(nameof(XRHandController));
+        protected static readonly ConsoleFormatter ConsoleFormatter = new ConsoleFormatter(nameof(XRHandController));
 
         /// <summary>
         /// Field on the <see cref="nonPhysicsAnimator"/> used for gripping.
@@ -92,6 +93,16 @@ namespace BlackTundra.World.XR {
         /// </summary>
         private const float GripInverseMoveTime = 1.0f / GripMoveTime;
 
+        /// <summary>
+        /// Size of the velocity buffer used for velocity smoothing.
+        /// </summary>
+        private const int VelocitySmoothingBufferSize = 3;
+
+        /// <summary>
+        /// Coefficient used to finalize the smooth velocity averaged value.
+        /// </summary>
+        private const float VelocitySmoothingCoefficient = 1.0f / VelocitySmoothingBufferSize;
+
         #endregion
 
         #region variable
@@ -106,6 +117,16 @@ namespace BlackTundra.World.XR {
         /// </summary>
         [SerializeField]
         private XRLocomotionController _locomotion = null;
+
+        /// <summary>
+        /// <see cref="XRRayInteractor"/> component attached to the <see cref="XRHandController"/> <see cref="gameObject"/>.
+        /// </summary>
+        private XRRayInteractor _interactor = null;
+
+        /// <summary>
+        /// <see cref="ActionBasedController"/> component attached to the <see cref="XRHandController"/> <see cref="gameObject"/>.
+        /// </summary>
+        private ActionBasedController _controller = null;
         #endregion
 
         #region Physics Hand
@@ -158,7 +179,7 @@ namespace BlackTundra.World.XR {
         [Min(0.0f)]
 #endif
         [SerializeField]
-        private float pushStrength = 5000.0f;
+        private float pushStrength = 4.0f;
 
         /// <summary>
         /// Maximum distance between the physics hand and the actual hand position that will be converted into a pushing force.
@@ -167,7 +188,7 @@ namespace BlackTundra.World.XR {
         [Min(ThresholdPushDistance)]
 #endif
         [SerializeField]
-        private float maxPushHandDistance = 0.2f;
+        private float maxPushHandDistance = 0.25f;
 
         /// <summary>
         /// Layermask used to detect objects that an item can collide with.
@@ -270,19 +291,19 @@ namespace BlackTundra.World.XR {
         private WorldItem item = null;
 
         /// <summary>
-        /// Item positional offset (defined on the <see cref="item"/>).
+        /// Positional offset of the held object.
         /// </summary>
-        private Vector3 itemPositionalOffset = Vector3.zero;
+        private Vector3 heldPositionalOffset = Vector3.zero;
 
         /// <summary>
-        /// Item rotational offset (defined on the <see cref="item"/>).
+        /// Rotational offset of the held object.
         /// </summary>
-        private Quaternion itemRotationalOffset = Quaternion.identity;
+        private Quaternion heldRotationalOffset = Quaternion.identity;
 
         /// <summary>
         /// Array containing every <see cref="Collider"/> component attached to the <see cref="item"/>.
         /// </summary>
-        private Collider[] itemColliders = null;
+        private Collider[] heldColliders = null;
 
         /// <summary>
         /// <see cref="Collider"/> buffer used for physics casting operations.
@@ -306,14 +327,14 @@ namespace BlackTundra.World.XR {
         private Vector3 lastPosition = Vector3.zero;
 
         /// <summary>
-        /// Position of the <see cref="item"/> before transforming it to look as if the item is where the player's hand is.
+        /// Position of the held object before transforming it to look as if it is where the player's hand is.
         /// </summary>
-        private Vector3 lastItemPosition = Vector3.zero;
+        private Vector3 lastHeldPosition = Vector3.zero;
 
         /// <summary>
-        /// Rotation of the <see cref="item"/> before transforming it to look as if the item is where the player's hand is.
+        /// Rotation of the held object before transforming it to look as if it is where the player's hand is.
         /// </summary>
-        private Quaternion lastItemRotation = Quaternion.identity;
+        private Quaternion lastHeldRotation = Quaternion.identity;
 
         /// <summary>
         /// List of <see cref="XRHandCollisionTracker"/> instances.
@@ -345,6 +366,27 @@ namespace BlackTundra.World.XR {
         /// </remarks>
         private bool skipHandUpdate = false;
 
+        /// <summary>
+        /// Last input position.
+        /// </summary>
+        private Vector3 lastInputPosition = Vector3.zero;
+
+        /// <summary>
+        /// Raw velocity of the <see cref="XRHandController"/>.
+        /// </summary>
+        private Vector3 _localVelocity = Vector3.zero;
+
+        /// <summary>
+        /// Calculated smooth velocity of the <see cref="XRHandController"/>.
+        /// </summary>
+        private Vector3 _smoothLocalVelocity = Vector3.zero;
+
+        /// <summary>
+        /// Velocity buffer containing the the previous velocities.
+        /// This is so that a smooth velocity value can be obtained.
+        /// </summary>
+        private readonly Vector3[] velocityBuffer = new Vector3[VelocitySmoothingBufferSize];
+
         #endregion
 
         #region property
@@ -357,12 +399,32 @@ namespace BlackTundra.World.XR {
         /// <summary>
         /// Describes if the hand is gripping anything.
         /// </summary>
-        public bool IsEmpty => gripTracker == null && !IsHoldingItem();
+        public virtual bool IsEmpty => !_interactor.hasSelection && !IsGrippingObject() && !IsHoldingItem();
 
         /// <summary>
         /// <see cref="XRLocomotionController"/> belonging to the <see cref="XRHandController"/>.
         /// </summary>
         public XRLocomotionController locomotion => _locomotion;
+
+        /// <summary>
+        /// <see cref="XRRayInteractor"/> attached to the <see cref="XRHandController"/>.
+        /// </summary>
+        public XRRayInteractor interactor => _interactor;
+
+        /// <summary>
+        /// <see cref="ActionBasedController"/> attached to the <see cref="XRHandController"/>.
+        /// </summary>
+        public ActionBasedController controller => _controller;
+
+        /// <summary>
+        /// Raw velocity of the <see cref="XRHandController"/>.
+        /// </summary>
+        public Vector3 velocity => _localVelocity + _locomotion.velocity;
+
+        /// <summary>
+        /// Smooth velocity of the <see cref="XRHandController"/>.
+        /// </summary>
+        public Vector3 smoothVelocity => _smoothLocalVelocity + _locomotion.velocity;
 
         #endregion
 
@@ -370,7 +432,9 @@ namespace BlackTundra.World.XR {
 
         #region Awake
 
-        private void Awake() {
+        protected virtual void Awake() {
+            _interactor = GetComponent<XRRayInteractor>();
+            _controller = GetComponent<ActionBasedController>();
             SetupPhysicsHands();
             SetupNonPhysicsHands();
         }
@@ -379,7 +443,7 @@ namespace BlackTundra.World.XR {
 
         #region OnEnable
 
-        private void OnEnable() {
+        protected virtual void OnEnable() {
             lastPosition = transform.position;
             lastPositionPhysics = lastPosition;
             EnableInput();
@@ -389,7 +453,7 @@ namespace BlackTundra.World.XR {
 
         #region OnDisable
 
-        private void OnDisable() {
+        protected virtual void OnDisable() {
             DisableInput();
         }
 
@@ -479,8 +543,7 @@ namespace BlackTundra.World.XR {
         #region SetupNonPhysicsHands
 
         private void SetupNonPhysicsHands() {
-            ActionBasedController actionBasedController = GetComponent<ActionBasedController>();
-            Transform model = actionBasedController.model;
+            Transform model = _controller.model;
             if (model != null) {
                 nonPhysicsAnimator = model.GetComponent<Animator>();
                 nonPhysicsRenderer = model.GetComponentInChildren<Renderer>();
@@ -494,13 +557,19 @@ namespace BlackTundra.World.XR {
 
         #region Update
 
-        private void Update() {
+        protected virtual void Update() {
             float deltaTime = Time.deltaTime;
-            // apply position and rotation:
-            transform.localPosition = _positionAction.ReadValue<Vector3>();
+            // update velocity:
+            Vector3 inputPosition = _positionAction.ReadValue<Vector3>();
+            Vector3 localVelocity = (inputPosition - lastInputPosition) * (1.0f / deltaTime);
+            RecordVelocity(transform.parent != null ? transform.parent.TransformDirection(localVelocity) : localVelocity);
+            lastInputPosition = inputPosition;
+            // update position and rotation:
+            transform.localPosition = inputPosition;
             transform.localRotation = _rotationAction.ReadValue<Quaternion>();
             // apply grip:
             gripAmount.Apply(_gripAction.ReadValue<float>(), GripAmountSmoothing * deltaTime);
+            _interactor.allowSelect = gripAmount > 0.0f; // toggle allowing select by how much grip is applied
             if (physicsAnimator != null) physicsAnimator.SetFloat(GripAnimatorPropertyName, gripAmount.value);
             if (nonPhysicsAnimator != null) nonPhysicsAnimator.SetFloat(GripAnimatorPropertyName, gripAmount.value);
             else SetupNonPhysicsHands();
@@ -524,16 +593,77 @@ namespace BlackTundra.World.XR {
 
         #endregion
 
+        #region LateUpdate
+
+        protected virtual void LateUpdate() {
+            if (skipHandUpdate) { // skip the current update
+                skipHandUpdate = false;
+                return;
+            }
+            // calculate timing variables:
+            float deltaTime = Time.deltaTime; // delta time
+            float inverseSqrDeltaTime = 1.0f / (deltaTime * deltaTime); // inverse delta time squared
+            // calculate hand movement vector:
+            Vector3 position = transform.position; // get the position of the non-physics hand
+            Vector3 deltaPosition = position - lastPosition; // calculate the vector from the last hand position to the current hand position
+            lastPosition = position; // update the last hand position
+            // update held object:
+            IXRSelectInteractable interactable = _interactor.GetOldestInteractableSelected();
+            if (interactable != null && interactable is Component component && component != null) {
+                UpdateHeldVisual(
+                    component.transform,
+                    ref lastHeldPosition,
+                    ref lastHeldRotation,
+                    deltaPosition,
+                    inverseSqrDeltaTime
+                );
+            }
+        }
+
+        #endregion
+
+        #region OnPostRender
+
+        protected virtual void OnPostRender() {
+            // reset held object position:
+            IXRSelectInteractable interactable = _interactor.GetOldestInteractableSelected();
+            if (interactable != null && interactable is Component component) {
+                component.transform.SetPositionAndRotation(
+                    lastHeldPosition,
+                    lastHeldRotation
+                );
+            }
+        }
+
+        #endregion
+
         #region InternalPhysicsUpdate
 
         /// <summary>
         /// Invoked by the <see cref="_locomotion"/> when <see cref="XRLocomotionController.FixedUpdate"/> is invoked.
         /// </summary>
         /// <param name="deltaTime"><see cref="Time.fixedDeltaTime"/></param>
-        internal void InternalPhysicsUpdate(in float deltaTime) {
+        protected internal virtual void InternalPhysicsUpdate(in float deltaTime) {
             UpdatePhysicsHand(deltaTime);
             UpdateCollisionTrackers(deltaTime);
             lastPositionPhysics = transform.position;
+        }
+
+        #endregion
+
+        #region RecordVelocity
+
+        private void RecordVelocity(in Vector3 velocity) {
+            _localVelocity = velocity;
+            _smoothLocalVelocity = velocity;
+            Vector3 v;
+            for (int i = VelocitySmoothingBufferSize - 1; i > 0; i--) {
+                v = velocityBuffer[i - 1];
+                velocityBuffer[i] = v;
+                _smoothLocalVelocity += v;
+            }
+            velocityBuffer[0] = velocity;
+            _smoothLocalVelocity *= VelocitySmoothingCoefficient;
         }
 
         #endregion
@@ -548,7 +678,7 @@ namespace BlackTundra.World.XR {
                 } else { // hand is still gripping current object
                     UpdateGripHand(deltaTime);
                 }
-            } else if (item == null && gripAmount.value > 0.5f && TryGrip()) { // hand wants to start gripping an object
+            } else if (CanGripObject() && gripAmount.value > 0.5f && TryGrip()) { // hand wants to start gripping an object
                 UpdateGripHand(deltaTime);
             } else { // hand is not gripping an object
                 UpdateFreeHand(deltaTime);
@@ -581,9 +711,9 @@ namespace BlackTundra.World.XR {
                 rigidbody.angularVelocity = Vector3.zero;
             } else { // hands are within an appropriate distance of the target hand position
                 // velocity tracking:
-                Vector3 velocity = deltaPosition * inverseDeltaTime;
+                Vector3 velocity = deltaPosition * (velocityScale * inverseDeltaTime);
                 if (!float.IsNaN(velocity.x)) {
-                    rigidbody.velocity = velocity * velocityScale;
+                    rigidbody.velocity = velocity;
                 }
                 // angular velocity tracking:
                 Quaternion targetRotation = transform.rotation;
@@ -705,48 +835,6 @@ namespace BlackTundra.World.XR {
 
         #endregion
 
-        #region LateUpdate
-
-        private void LateUpdate() {
-            if (skipHandUpdate) { // skip the current update
-                skipHandUpdate = false;
-                return;
-            }
-            // calculate timing variables:
-            float deltaTime = Time.deltaTime; // delta time
-            float inverseSqrDeltaTime = 1.0f / (deltaTime * deltaTime); // inverse delta time squared
-            // calculate hand movement vector:
-            Vector3 position = transform.position; // get the position of the non-physics hand
-            Vector3 deltaPosition = position - lastPosition; // calculate the vector from the last hand position to the current hand position
-            lastPosition = position; // update the last hand position
-            // update item:
-            if (item != null) {
-                UpdateHeldVisual(
-                    item.transform,
-                    ref lastItemPosition,
-                    ref lastItemRotation,
-                    deltaPosition,
-                    inverseSqrDeltaTime
-                );
-            }
-        }
-
-        #endregion
-
-        #region OnPostRender
-
-        private void OnPostRender() {
-            // reset item position:
-            if (item != null) {
-                item.transform.SetPositionAndRotation(
-                    lastItemPosition,
-                    lastItemRotation
-                );
-            }
-        }
-
-        #endregion
-        
         #region UpdateHeldVisual
 
         /// <summary>
@@ -791,23 +879,9 @@ namespace BlackTundra.World.XR {
             itemRigidbody.detectCollisions = true;
             itemRigidbody.isKinematic = false;
             Transform itemTransform = item.transform;
-            lastItemPosition = itemTransform.position;
-            lastItemRotation = itemTransform.rotation;
+            lastHeldPosition = itemTransform.position;
+            lastHeldRotation = itemTransform.rotation;
         }
-
-        #endregion
-
-        #region IsHoldingItem
-
-        public bool IsHoldingItem() => item != null;
-
-        public bool IsHoldingItem(in WorldItem item) => item != null && this.item == item;
-
-        #endregion
-
-        #region CanTakeItem
-
-        public bool CanTakeItem(in WorldItem item, in IItemHolder holder) => item != null && item != this.item && gripTracker == null;
 
         #endregion
 
@@ -840,9 +914,89 @@ namespace BlackTundra.World.XR {
 
         #endregion
 
+        // holding (physical rigidbody object held in hand):
+
+        #region IsHoldingItem
+
+        public bool IsHoldingItem() => item != null;
+
+        public bool IsHoldingItem(in WorldItem item) => item != null && this.item == item;
+
+        #endregion
+
+        #region CanTakeItem
+
+        /// <returns>
+        /// Returns <c>true</c> if the <see cref="XRHandController"/> can pick up an item.
+        /// </returns>
+        public virtual bool CanTakeItem() => IsEmpty;
+
+        /// <inheritdoc cref="IItemHolder.CanTakeItem(in WorldItem, in IItemHolder)"/>
+        public bool CanTakeItem(in WorldItem item, in IItemHolder holder) => item != null && CanTakeItem();
+
+        #endregion
+
+        #region TryHold
+
+        /// <summary>
+        /// Tells the <see cref="XRHandController"/> to try and hold an <see cref="XRGrabInteractable"/>.
+        /// </summary>
+        /// <returns>
+        /// Returns <c>true</c> if the hold operation was successful.
+        /// </returns>
+        public bool TryHold(in XRGrabInteractable interactable) {
+            if (interactable == null || !IsEmpty) return false; // hands are not empty, a new object cannot be held
+            IXRSelectInteractable interactableInterface = interactable; // get the interactable interface
+            //_interactor.useForceGrab = true;
+            _interactor.StartManualInteraction(interactableInterface); // manually start an interaction with the target
+            InitialiseHeldObjectData(interactable);
+            return true; // success
+        }
+
+        #endregion
+
+        #region TryRelease
+
+        /// <summary>
+        /// Tells the <see cref="XRHandController"/> to try to release the currently held object.
+        /// </summary>
+        /// <returns>
+        /// Returns <c>true</c> if the release operation was successful.
+        /// </returns>
+        public bool TryRelease() {
+            if (!_interactor.isPerformingManualInteraction) return false;
+            IXRSelectInteractable interactableInterface = _interactor.GetOldestInteractableSelected();
+            if (interactableInterface != null && interactableInterface is XRGrabInteractable interactable) {
+                ReleaseHeldItem(interactable);
+                Rigidbody rigidbody = interactable.GetComponent<Rigidbody>();
+                if (rigidbody != null) {
+                    rigidbody.velocity = _smoothLocalVelocity * interactable.throwVelocityScale;
+                    rigidbody.angularVelocity = Vector3.zero;
+                }
+            }
+            _interactor.EndManualInteraction();
+            return true;
+        }
+
+        #endregion
+
+        #region ForceDrop
+
+        /// <summary>
+        /// Forces the <see cref="XRHandController"/> to drop any held items.
+        /// </summary>
+        public void ForceDrop() {
+            if (_interactor.isPerformingManualInteraction) {
+                _interactor.EndManualInteraction();
+            }
+            _interactor.allowSelect = false;
+        }
+
+        #endregion
+
         #region OnHoldItem
 
-        public void OnHoldItem(in WorldItem item) {
+        public virtual void OnHoldItem(in WorldItem item) {
             if (item == null) throw new ArgumentNullException(nameof(item));
             // assign item:
             this.item = item;
@@ -851,57 +1005,23 @@ namespace BlackTundra.World.XR {
             // reset item collision:
             ResetItemCollision();
             // check for grab interactable:
-            XRGrabInteractable xrGrabInteractable = item.GetComponent<XRGrabInteractable>();
-            if (xrGrabInteractable != null && xrGrabInteractable.attachTransform != null) { // the item has a valid XR interactable
-                itemPositionalOffset = -item.transform.InverseTransformPoint(xrGrabInteractable.attachTransform.position);
-                itemRotationalOffset = Quaternion.Inverse(xrGrabInteractable.attachTransform.rotation) * item.transform.rotation;
-                // check if item is already tracked:
-                bool disableCollision = true;
-                int trackerCount = collisionTrackers.Count; // get the number of collision trackers
-                if (trackerCount > 0) { // there are collision trackers
-                    XRHandCollisionTracker tracker; // current tracker
-                    for (int i = 0; i < trackerCount; i++) { // iterate each tracker
-                        tracker = collisionTrackers[i]; // get the current tracker
-                        if (tracker.item == item) { // item already tracked by the current tracker
-                            disableCollision = false; // no need to disable collision again
-                            break;
-                        }
-                    }
-                }
-                // process colliders:
-                itemColliders = item.gameObject.GetColliders(false);
-                if (disableCollision) {
-                    IgnoreCollisionWithColliders(itemColliders, true);
-                }
-                physicsColliderBuffer = new Collider[itemColliders.Length + 1];
-            } else {
-                itemPositionalOffset = Vector3.zero;
-                itemRotationalOffset = Quaternion.identity;
-                itemColliders = null;
-            }
+            XRGrabInteractable interactable = item.GetComponent<XRGrabInteractable>();
+            InitialiseHeldObjectData(interactable);
         }
 
         #endregion
 
         #region OnReleaseItem
 
-        public void OnReleaseItem(in WorldItem item) {
+        public virtual void OnReleaseItem(in WorldItem item) {
             if (item == null) throw new ArgumentNullException(nameof(item));
             if (this.item != item) return; // item released is not the held item
             physicsRenderer.enabled = true; // re-enable physics renderer (if disabled)
             // reset item collision:
             ResetItemCollision();
             // process item colliders:
-            if (itemColliders != null) {
-                collisionTrackers.Add(
-                    new XRHandCollisionTracker(
-                        item,
-                        itemColliders,
-                        physicsColliders
-                    )
-                );
-                itemColliders = null;
-            }
+            XRGrabInteractable interactable = item.GetComponent<XRGrabInteractable>();
+            ReleaseHeldItem(interactable);
             // reset item state:
             item.SetPrimaryUseState(false);
             item.SetSecondaryUseState(false);
@@ -911,6 +1031,97 @@ namespace BlackTundra.World.XR {
             // skip hand update:
             skipHandUpdate = true;
         }
+
+        #endregion
+
+        #region InitialiseHeldObjectData
+
+        /// <summary>
+        /// Initialises data used for tracking the currently held <paramref name="interactable"/>.
+        /// </summary>
+        private void InitialiseHeldObjectData(in XRGrabInteractable interactable) {
+            if (interactable != null) { // the item has a valid XR interactable
+                // get references:
+                Transform interactableTransform = interactable.transform;
+                Transform attachTransform = interactable.attachTransform;
+                if (attachTransform != null) {
+                    // calculate offsets:
+                    heldPositionalOffset = -interactableTransform.InverseTransformPoint(attachTransform.position);
+                    heldRotationalOffset = Quaternion.Inverse(attachTransform.rotation) * interactableTransform.rotation;
+                } else {
+                    heldPositionalOffset = Vector3.zero;
+                    heldRotationalOffset = Quaternion.identity;
+                }
+                // check if interactable is already tracked:
+                bool disableCollision = true;
+                int trackerCount = collisionTrackers.Count; // get the number of collision trackers
+                if (trackerCount > 0) { // there are collision trackers
+                    XRHandCollisionTracker tracker; // current tracker
+                    for (int i = 0; i < trackerCount; i++) { // iterate each tracker
+                        tracker = collisionTrackers[i]; // get the current tracker
+                        if (tracker.interactable == interactable) { // item already tracked by the current tracker
+                            disableCollision = false; // no need to disable collision again
+                            break;
+                        }
+                    }
+                }
+                // process colliders:
+                heldColliders = interactable.gameObject.GetColliders(false);
+                if (disableCollision) {
+                    IgnoreCollisionWithColliders(heldColliders, true);
+                }
+                physicsColliderBuffer = new Collider[heldColliders.Length + 1];
+            } else {
+                heldPositionalOffset = Vector3.zero;
+                heldRotationalOffset = Quaternion.identity;
+                heldColliders = null;
+            }
+        }
+
+        #endregion
+
+        #region ReleaseHeldItem
+
+        /// <summary>
+        /// Releases the <paramref name="interactable"/> and begins tracking collisions with the <paramref name="interactable"/>.
+        /// </summary>
+        private void ReleaseHeldItem(in XRGrabInteractable interactable) {
+            if (heldColliders != null) {
+                collisionTrackers.Add(
+                    new XRHandCollisionTracker(
+                        interactable,
+                        heldColliders,
+                        physicsColliders
+                    )
+                );
+                heldColliders = null;
+            }
+        }
+
+        #endregion
+
+        // gripping (an object in the scene that is being gripped by the hand):
+
+        #region IsGrippingObject
+
+        /// <returns>
+        /// Returns <c>true</c> if the <see cref="XRHandController"/> is gripping an object.
+        /// </returns>
+        public bool IsGrippingObject() => gripTracker != null;
+
+        /// <returns>
+        /// Returns <c>true</c> if the <see cref="XRHandController"/> is the <paramref name="transform"/> specifically.
+        /// </returns>
+        public bool IsGrippingObject(in Transform transform) => gripTracker != null && gripTracker.transform == transform;
+
+        #endregion
+
+        #region CanGripObject
+
+        /// <returns>
+        /// Returns <c>true</c> when the <see cref="XRHandController"/> is in a state that it could grip an object if it wanted to.
+        /// </returns>
+        public virtual bool CanGripObject() => IsEmpty;
 
         #endregion
 

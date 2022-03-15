@@ -40,7 +40,7 @@ namespace BlackTundra.World {
                 force -= 1000.0f;
                 return CameraShakeSource.CreateAt(
                     point,
-                    Mathf.Clamp(force * 0.005f, 0.0f, 1.0f),
+                    Mathf.Clamp(force * 0.001f, 0.0f, 0.25f),
                     Mathf.Clamp(force * 0.01f, 25.0f, 75.0f),
                     false,
                     Mathf.Clamp(force * 0.00025f, 0.5f, 1.0f),

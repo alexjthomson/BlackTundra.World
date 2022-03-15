@@ -500,7 +500,10 @@ namespace BlackTundra.World.Items {
 
         #region XRPickupItem
 #if USE_XR_TOOLKIT
-        public void XRPickupItem() {
+        /// <summary>
+        /// Method that should be called by the <see cref="XRGrabInteractable"/> attached to the <see cref="WorldItem"/>.
+        /// </summary>
+        public void XRPickupItem(SelectEnterEventArgs _) {
             IXRSelectInteractor interactor = xrGrabInteractable.GetOldestInteractorSelecting();
             if (interactor is Behaviour interactorBehaviour) {
                 IItemHolder itemHolder = interactorBehaviour.GetComponent<IItemHolder>();
@@ -533,7 +536,10 @@ namespace BlackTundra.World.Items {
 
         #region XRReleaseItem
 #if USE_XR_TOOLKIT
-        public void XRReleaseItem() {
+        /// <summary>
+        /// Method that should be called by the <see cref="XRGrabInteractable"/> attached to the <see cref="WorldItem"/>.
+        /// </summary>
+        public void XRReleaseItem(SelectExitEventArgs _) {
             if (holder != null) {
                 Behaviour holderBehaviour = holder as Behaviour;
                 if (holderBehaviour != null) {
