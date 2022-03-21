@@ -18,7 +18,7 @@ namespace BlackTundra.World {
 
         void AddForceAtPosition(in Vector3 force, in Vector3 position, in ForceMode forceMode);
 
-        void AddExplosionForce(in float force, in Vector3 point, in float radius, float upwardsModifier = 0.0f, in ForceMode forceMode = ForceMode.Force);
+        void AddExplosionForce(in float force, in Vector3 point, in float radius, float upwardsModifier, in ForceMode forceMode);
 
     }
 
