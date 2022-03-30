@@ -417,6 +417,25 @@ namespace BlackTundra.World.XR {
         public ActionBasedController controller => _controller;
 
         /// <summary>
+        /// Actual position of the <see cref="XRHandController"/>.
+        /// </summary>
+        /// <seealso cref="actualTransform"/>
+        public Vector3 position => rigidbody != null ? rigidbody.position : transform.position;
+
+        /// <summary>
+        /// Actual rotation of the <see cref="XRHandController"/>.
+        /// </summary>
+        /// <seealso cref="actualTransform"/>
+        public Quaternion rotation => rigidbody != null ? rigidbody.rotation : transform.rotation;
+
+        /// <summary>
+        /// <see cref="Transform"/> component that contains the actual position and rotation of the <see cref="XRHandController"/> in the world.
+        /// </summary>
+        /// <seealso cref="position"/>
+        /// <seealso cref="rotation"/>
+        public Transform actualTransform => rigidbody != null ? rigidbody.transform : transform;
+
+        /// <summary>
         /// Raw velocity of the <see cref="XRHandController"/>.
         /// </summary>
         public Vector3 velocity => _localVelocity + _locomotion.velocity;

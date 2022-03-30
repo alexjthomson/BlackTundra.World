@@ -4,6 +4,7 @@ using BlackTundra.Foundation.Control;
 using BlackTundra.Foundation.IO;
 using BlackTundra.Foundation.Utility;
 using BlackTundra.World.CameraSystem;
+using BlackTundra.World.Targetting;
 using BlackTundra.World.XR.Locomotion;
 
 using System;
@@ -26,7 +27,7 @@ namespace BlackTundra.World.XR {
     [DefaultExecutionOrder(-1)]
     [AddComponentMenu("XR/Locomotion Controller")]
 #endif
-    public sealed class XRLocomotionController : MonoBehaviour, IControllable, IPhysicsObject {
+    public sealed class XRLocomotionController : MonoBehaviour, IControllable, IPhysicsObject, ITargetable {
 
         #region constant
 
@@ -238,6 +239,15 @@ namespace BlackTundra.World.XR {
         public bool grounded => _grounded;
         private bool _grounded = false;
 
+        /// <summary>
+        /// Custom targetting flags for the <see cref="XRLocomotionController"/>.
+        /// </summary>
+        public int TargetFlags {
+            get => _targetFlags;
+            set => _targetFlags = value;
+        }
+        private int _targetFlags;
+
         // physics:
 
         [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.physics.mass", 80.0f)]
@@ -424,6 +434,7 @@ namespace BlackTundra.World.XR {
             get => _turnBaseSpeed;
             set => _turnBaseSpeed = Mathf.Clamp(value, 0.0f, 720.0f);
         }
+
         internal static float _turnBaseSpeed = 120.0f;
 
         #endregion
@@ -448,6 +459,7 @@ namespace BlackTundra.World.XR {
         private void OnEnable() {
             EnableInputActions();
             this.GainControl(true);
+            ((ITargetable)this).Register();
         }
 
         #endregion
@@ -455,6 +467,7 @@ namespace BlackTundra.World.XR {
         #region OnDisable
 
         private void OnDisable() {
+            ((ITargetable)this).Deregister();
             DisableInputActions();
             this.RevokeControl(true);
         }

@@ -55,8 +55,8 @@ namespace BlackTundra.World.Ballistics {
 
         private void OnEnable() {
             if (lineRenderer == null) lineRenderer = GetComponent<LineRenderer>();
-            projectile.SetStartParameters(transform.position, transform.forward, projectile.kineticEnergy);
-            ResetLineRenderer();
+            //projectile.SetStartParameters(transform.position, transform.forward, projectile.kineticEnergy);
+            //SetLineRendererPosition();
         }
 
         #endregion
@@ -69,7 +69,7 @@ namespace BlackTundra.World.Ballistics {
                 Vector3[] points = new Vector3[pointCount];
                 lineRenderer.GetPositions(points);
                 int finalIndex = pointCount - 1;
-                for (int i = 0; i < finalIndex;) points[i] = points[++i];
+                for (int i = 0; i < finalIndex; i++) points[i] = points[i + 1];
                 points[finalIndex] = projectile._position;
                 lineRenderer.SetPositions(points);
                 updateLineRenderer = false;
@@ -95,10 +95,10 @@ namespace BlackTundra.World.Ballistics {
 
         #region ResetLineRenderer
 
-        private void ResetLineRenderer() {
+        private void SetLineRendererPosition(in Vector3 point) {
             int pointCount = lineRenderer.positionCount;
             Vector3[] points = new Vector3[pointCount];
-            for (int i = 0; i < pointCount; i++) points[i] = projectile._position;
+            for (int i = 0; i < pointCount; i++) points[i] = point;
             lineRenderer.SetPositions(points);
             updateLineRenderer = false;
         }
@@ -110,6 +110,7 @@ namespace BlackTundra.World.Ballistics {
         public void SetStartParameters(in Vector3 position, in Vector3 direction, in float kineticEnergy) {
             projectile.SetStartParameters(position, direction, kineticEnergy);
             UpdateTransform();
+            SetLineRendererPosition(position);
             enabled = true;
         }
 
@@ -118,13 +119,16 @@ namespace BlackTundra.World.Ballistics {
         #region UpdateTransform
 
         private void UpdateTransform() {
+            transform.position = projectile._position;
+            /*
             transform.SetPositionAndRotation(
                 projectile._position,
                 Quaternion.LookRotation(
-                    projectile._velocity,
+                    transform.forward + projectile._velocity,
                     Vector3.up
                 )
             );
+            */
         }
 
         #endregion
@@ -133,7 +137,7 @@ namespace BlackTundra.World.Ballistics {
 
         public bool IsAvailable(in ObjectPool objectPool) {
             if (objectPool == null) throw new ArgumentNullException(nameof(objectPool));
-            return parentPool == null && projectile != null && projectile._lifetime < 0.0f;
+            return projectile != null && ((parentPool == null && projectile._lifetime < 0.0f) || !enabled);
         }
 
         #endregion

@@ -349,9 +349,9 @@ namespace BlackTundra.World.Targetting {
         /// <returns>
         /// Returns every registered <see cref="ITargetable"/> instance.
         /// </returns>
-        public static List<ITargetable> FindTargetsAt(in Vector3 point, in float radius) {
+        public static OrderedList<float, ITargetable> FindTargetsAt(in Vector3 point, in float radius) {
             // create list:
-            List<ITargetable> list = new List<ITargetable>();
+            OrderedList<float, ITargetable> list = new OrderedList<float, ITargetable>();
             // find number of registered targets:
             int targetCount = TargetBuffer.Count;
             if (targetCount == 0) return list; // no targets are registered
@@ -359,9 +359,11 @@ namespace BlackTundra.World.Targetting {
             float sqrRadius = radius * radius;
             // find targets with matching flags:
             ITargetable target;
+            float sqrDistance;
             for (int i = targetCount - 1; i >= 0; i--) {
                 target = TargetBuffer[i];
-                if ((target.position - point).sqrMagnitude < sqrRadius) list.Add(target);
+                sqrDistance = (target.position - point).sqrMagnitude;
+                if (sqrDistance < sqrRadius) list.Add(sqrDistance, target);
             }
             return list;
         }
@@ -370,10 +372,10 @@ namespace BlackTundra.World.Targetting {
         /// Finds all registered <see cref="ITargetable"/> instances that matche the custom <paramref name="matchDelegate"/>.
         /// </summary>
         /// <param name="matchDelegate"><see cref="TargetMatchDelegate"/> used to apply a set of custom match conditions.</param>
-        public static List<ITargetable> FindTargetsAt(in Vector3 point, in float radius, in TargetMatchDelegate matchDelegate) {
+        public static OrderedList<float, ITargetable> FindTargetsAt(in Vector3 point, in float radius, in TargetMatchDelegate matchDelegate) {
             if (matchDelegate == null) throw new ArgumentNullException(nameof(matchDelegate));
             // create list:
-            List<ITargetable> list = new List<ITargetable>();
+            OrderedList<float, ITargetable> list = new OrderedList<float, ITargetable>();
             // find number of registered targets:
             int targetCount = TargetBuffer.Count;
             if (targetCount == 0) return list; // no targets are registered
@@ -381,9 +383,11 @@ namespace BlackTundra.World.Targetting {
             float sqrRadius = radius * radius;
             // find targets with matching flags:
             ITargetable target;
+            float sqrDistance;
             for (int i = targetCount - 1; i >= 0; i--) {
                 target = TargetBuffer[i];
-                if ((target.position - point).sqrMagnitude < sqrRadius && matchDelegate.Invoke(target)) list.Add(target);
+                sqrDistance = (target.position - point).sqrMagnitude;
+                if (sqrDistance < sqrRadius && matchDelegate.Invoke(target)) list.Add(sqrDistance, target);
             }
             return list;
         }
@@ -394,9 +398,9 @@ namespace BlackTundra.World.Targetting {
         /// <remarks>
         /// This will never return <c>null</c>.
         /// </remarks>
-        public static List<ITargetable> FindTargetsAt(in Vector3 point, in float radius, in int flags) {
+        public static OrderedList<float, ITargetable> FindTargetsAt(in Vector3 point, in float radius, in int flags) {
             // create list:
-            List<ITargetable> list = new List<ITargetable>();
+            OrderedList<float, ITargetable> list = new OrderedList<float, ITargetable>();
             // find number of registered targets:
             int targetCount = TargetBuffer.Count;
             if (targetCount == 0) return list; // no targets are registered
@@ -404,9 +408,13 @@ namespace BlackTundra.World.Targetting {
             float sqrRadius = radius * radius;
             // find targets with matching flags:
             ITargetable target;
+            float sqrDistance;
             for (int i = targetCount - 1; i >= 0; i--) {
                 target = TargetBuffer[i];
-                if ((target.TargetFlags & flags) != 0 && (target.position - point).sqrMagnitude < sqrRadius) list.Add(target);
+                if ((target.TargetFlags & flags) != 0) {
+                    sqrDistance = (target.position - point).sqrMagnitude;
+                    if (sqrDistance < sqrRadius) list.Add(sqrDistance, target);
+                }
             }
             return list;
         }
@@ -419,10 +427,10 @@ namespace BlackTundra.World.Targetting {
         /// This will never return <c>null</c>.
         /// </remarks>
         /// <param name="matchDelegate"><see cref="TargetMatchDelegate"/> used to apply a set of custom match conditions.</param>
-        public static List<ITargetable> FindTargetsAt(in Vector3 point, in float radius, in int flags, in TargetMatchDelegate matchDelegate) {
+        public static OrderedList<float, ITargetable> FindTargetsAt(in Vector3 point, in float radius, in int flags, in TargetMatchDelegate matchDelegate) {
             if (matchDelegate == null) throw new ArgumentNullException(nameof(matchDelegate));
             // create list:
-            List<ITargetable> list = new List<ITargetable>();
+            OrderedList<float, ITargetable> list = new OrderedList<float, ITargetable>();
             // find number of registered targets:
             int targetCount = TargetBuffer.Count;
             if (targetCount == 0) return list; // no targets are registered
@@ -430,9 +438,13 @@ namespace BlackTundra.World.Targetting {
             float sqrRadius = radius * radius;
             // find targets with matching flags:
             ITargetable target;
+            float sqrDistance;
             for (int i = targetCount - 1; i >= 0; i--) {
                 target = TargetBuffer[i];
-                if ((target.TargetFlags & flags) != 0 && (target.position - point).sqrMagnitude < sqrRadius && matchDelegate.Invoke(target)) list.Add(target);
+                if ((target.TargetFlags & flags) != 0) {
+                    sqrDistance = (target.position - point).sqrMagnitude;
+                    if (sqrDistance < sqrRadius && matchDelegate.Invoke(target)) list.Add(sqrDistance, target);
+                }
             }
             return list;
         }
@@ -445,9 +457,9 @@ namespace BlackTundra.World.Targetting {
         /// </summary>
         /// <param name="flags">Isolated flags that should be tested for.</param>
         /// <param name="matchCondition">Flags that should be set out of the <paramref name="flags"/>.</param>
-        public static List<ITargetable> FindTargetsAt(in Vector3 point, in float radius, in int flags, int matchCondition) {
+        public static OrderedList<float, ITargetable> FindTargetsAt(in Vector3 point, in float radius, in int flags, int matchCondition) {
             // create list:
-            List<ITargetable> list = new List<ITargetable>();
+            OrderedList<float, ITargetable> list = new OrderedList<float, ITargetable>();
             // find number of registered targets:
             int targetCount = TargetBuffer.Count;
             if (targetCount == 0) return list; // no targets are registered
@@ -457,9 +469,13 @@ namespace BlackTundra.World.Targetting {
             matchCondition &= flags; // ensure only bits set in the flags are set in the match conditions
             // find targets with matching flags:
             ITargetable target;
+            float sqrDistance;
             for (int i = targetCount - 1; i >= 0; i--) {
                 target = TargetBuffer[i];
-                if ((target.TargetFlags & flags) == matchCondition && (target.position - point).sqrMagnitude < sqrRadius) list.Add(target);
+                if ((target.TargetFlags & flags) == matchCondition) {
+                    sqrDistance = (target.position - point).sqrMagnitude;
+                    if (sqrDistance < sqrRadius) list.Add(sqrDistance, target);
+                }
             }
             return list;
         }
@@ -475,10 +491,10 @@ namespace BlackTundra.World.Targetting {
         /// <param name="flags">Isolated flags that should be tested for.</param>
         /// <param name="matchCondition">Flags that should be set out of the <paramref name="flags"/>.</param>
         /// <param name="matchDelegate"><see cref="TargetMatchDelegate"/> used to apply a set of custom match conditions.</param>
-        public static List<ITargetable> FindTargetsAt(in Vector3 point, in float radius, in int flags, int matchCondition, in TargetMatchDelegate matchDelegate) {
+        public static OrderedList<float, ITargetable> FindTargetsAt(in Vector3 point, in float radius, in int flags, int matchCondition, in TargetMatchDelegate matchDelegate) {
             if (matchDelegate == null) throw new ArgumentNullException(nameof(matchDelegate));
             // create list:
-            List<ITargetable> list = new List<ITargetable>();
+            OrderedList<float, ITargetable> list = new OrderedList<float, ITargetable>();
             // find number of registered targets:
             int targetCount = TargetBuffer.Count;
             if (targetCount == 0) return list; // no targets are registered
@@ -488,9 +504,13 @@ namespace BlackTundra.World.Targetting {
             matchCondition &= flags; // ensure only bits set in the flags are set in the match conditions
             // find targets with matching flags:
             ITargetable target;
+            float sqrDistance;
             for (int i = targetCount - 1; i >= 0; i--) {
                 target = TargetBuffer[i];
-                if ((target.TargetFlags & flags) == matchCondition && (target.position - point).sqrMagnitude < sqrRadius && matchDelegate.Invoke(target)) list.Add(target);
+                if ((target.TargetFlags & flags) == matchCondition) {
+                    sqrDistance = (target.position - point).sqrMagnitude;
+                    if (sqrDistance < sqrRadius && matchDelegate.Invoke(target)) list.Add(sqrDistance, target);
+                }
             }
             return list;
         }

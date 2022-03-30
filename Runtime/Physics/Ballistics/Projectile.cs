@@ -147,6 +147,11 @@ namespace BlackTundra.World.Ballistics {
             }
             // calculate speed and direction:
             float sqrSpeed = _velocity.sqrMagnitude; // calculate the square magnitude of the velocity
+            if (sqrSpeed < Mathf.Epsilon) { // projectile has stopped moving
+                Debug.Log("shit " + kineticEnergy + "J " + _velocity);
+                OnLifetimeExpired();
+                return;
+            }
             float speed = Mathf.Sqrt(sqrSpeed); // calculate the speed of the projectile
             Vector3 direction = _velocity * (1.0f / speed); // calculate the direction that the projectile is currently moving in
             // create new velocity variable:
@@ -344,7 +349,9 @@ namespace BlackTundra.World.Ballistics {
                             1.0f / rigidbody.mass,
                             direction
                         );
-                        rigidbody.AddForceAtPosition(impactForce, hit.point, ForceMode.VelocityChange);
+                        if (!float.IsNaN(impactForce.x)) {
+                            rigidbody.AddForceAtPosition(impactForce, hit.point, ForceMode.VelocityChange);
+                        }
                     }
                 }
             }

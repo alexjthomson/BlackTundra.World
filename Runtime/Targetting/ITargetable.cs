@@ -38,7 +38,7 @@ namespace BlackTundra.World.Targetting {
         /// Get the predicted position of the <see cref="ITargetable"/> <paramref name="time"/> seconds in the future.
         /// </summary>
         /// <param name="time">Number of seconds in the future to predict the position of the <see cref="ITargetable"/>.</param>
-        public Vector3 GetPredictedPosition(in float time) => position + (velocity * time);
+        public virtual Vector3 GetPredictedPosition(in float time) => position + (velocity * time);
 
         /// <summary>
         /// Registers the <see cref="ITargetable"/> as an object that can be targetted.
