@@ -55,19 +55,39 @@ namespace BlackTundra.World.XR {
         /// </summary>
         private const float MaxGroundedDownwardDeltaHeightRate = -10.0f;
 
+        /// <summary>
+        /// Mass of the <see cref="XRLocomotionController"/>.
+        /// </summary>
+        private const float Mass = 80.0f;
+
+        /// <summary>
+        /// Inverse mass of the <see cref="XRLocomotionController"/>.
+        /// </summary>
+        private const float InverseMass = 1.0f / Mass;
+
+        /// <summary>
+        /// Half the negative drag coefficient of a human.
+        /// </summary>
+        private const float HalfNegativeDragCoefficient = -1.2f * 0.5f;
+
+        /// <summary>
+        /// Amount to dampen the physics velocity while grounded.
+        /// </summary>
+        private const float GroundedVelocityDampenFactor = 25.0f;
+
         #endregion
 
         #region variable
 
         /// <summary>
-        /// <see cref="XRMoveController"/> responsible for moving the <see cref="XRLocomotionController"/>.
+        /// <see cref="XRMovementProvider"/> responsible for moving the <see cref="XRLocomotionController"/>.
         /// </summary>
-        private XRMoveController moveController = null;
+        private XRMovementProvider movementProvider = null;
 
         /// <summary>
-        /// <see cref="XRTurnController"/> responsible for turning the <see cref="XRLocomotionController"/>.
+        /// <see cref="XRTurnProvider"/> responsible for turning the <see cref="XRLocomotionController"/>.
         /// </summary>
-        private XRTurnController turnController = null;
+        private XRTurnProvider turnProvider = null;
 
         /// <summary>
         /// Toggles if the <see cref="XRLocomotionController"/> should use gravity.
@@ -238,6 +258,7 @@ namespace BlackTundra.World.XR {
         private float _radius = 1.0f;
         public bool grounded => _grounded;
         private bool _grounded = false;
+        public float mass => Mass;
 
         /// <summary>
         /// Custom targetting flags for the <see cref="XRLocomotionController"/>.
@@ -248,194 +269,26 @@ namespace BlackTundra.World.XR {
         }
         private int _targetFlags;
 
-        // physics:
-
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.physics.mass", 80.0f)]
-        private static float __Mass {
-            get => _mass;
+        private XRForwardDirection ForwardDirection {
+            get => _forwardDirection;
             set {
-                _mass = Mathf.Max(1.0f, value);
-                _inverseMass = 1.0f / _mass;
-            }
-        }
-        public float mass => _mass;
-        private static float _mass = 80.0f;
-        private static float _inverseMass = 1.0f / 80.0f;
-
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.physics.gravity", -9.81f)]
-        private static float Gravity {
-            get => _gravity;
-            set => _gravity = value;
-        }
-        private static float _gravity = -9.81f;
-
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.physics.drag.air", 0.1f)]
-        private static float DragAir {
-            get => _dragAir;
-            set => _dragAir = Mathf.Max(value, 0.0f);
-        }
-        private static float _dragAir = 0.5f;
-
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.physics.drag.ground", 0.5f)]
-        private static float DragGround {
-            get => _dragGround;
-            set => _dragGround = Mathf.Max(value, 0.0f);
-        }
-        private static float _dragGround = 25.0f;
-
-        // move:
-
-        /// <summary>
-        /// When equal to `<c>continuous</c>`, smooth continuous movement is enabled.
-        /// When equal to `<c>teleport</c>`, teleport movement is enabled.
-        /// </summary>
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.move.type", "smooth")]
-        private static string MoveType {
-            get => _moveType.ToString().ToLower();
-            set {
-                if (Enum.TryParse(typeof(XRMoveType), value, true, out object moveTypeObj)) {
-                    XRMoveType moveType = (XRMoveType)moveTypeObj;
-                    if (moveType != _moveType) {
-                        _moveType = moveType;
-                        if (instance != null) {
-                            instance.UpdateMoveController();
-                        }
-                    }
-                }
-            }
-        }
-        private static XRMoveType _moveType = XRMoveType.Smooth;
-
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.move.forward", "head")]
-        private static string ForwardDirection {
-            get => _forwardDirection.ToString().ToLower();
-            set {
-                if (Enum.TryParse(typeof(XRForwardDirection), value, true, out object forwardDirectionObj)) {
-                    XRForwardDirection forwardDirection = (XRForwardDirection)forwardDirectionObj;
-                    if (forwardDirection != _forwardDirection) {
-                        _forwardDirection = forwardDirection;
-                        if (instance != null) {
-                            instance.UpdateForwardDirection();
-                        }
-                    }
+                if (_forwardDirection != value) {
+                    _forwardDirection = value;
+                    UpdateForwardDirection();
                 }
             }
         }
         private static XRForwardDirection _forwardDirection = XRForwardDirection.Head;
 
-        /// <summary>
-        /// Maximum teleport distance when using teleport movement.
-        /// </summary>
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.move.teleport.max_distance", 5.0f)]
-        private static float MaxTeleportDistance {
-            get => _teleportMoveDistance;
-            set => _teleportMoveDistance = Mathf.Clamp(value, 0.0f, 100.0f);
-        }
-        internal static float _teleportMoveDistance = 5.0f;
-
-        /// <summary>
-        /// Cooldown between teleports when using teleport movement.
-        /// </summary>
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.move.teleport.cooldown", 0.25f)]
-        private static float TeleportMoveCooldown {
-            get => _teleportMoveCooldown;
-            set => _teleportMoveCooldown = Mathf.Clamp(value, 0.0f, 2.0f);
-        }
-        internal static float _teleportMoveCooldown = 0.25f;
-
-        /// <summary>
-        /// When <c>true</c>, a line renderer is used when using teleport movement.
-        /// </summary>
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.move.teleport.line_renderer", true)]
-        private static bool TeleportUseLineRenderer {
-            get => _teleportLineRenderer;
-            set => _teleportLineRenderer = value;
-        }
-        internal static bool _teleportLineRenderer = true;
-
-        /// <summary>
-        /// Base movement speed when using continuous movement.
-        /// </summary>
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.move.continuous.base_speed", 2.5f)]
-        private static float ContinuousMoveBaseSpeed {
-            get => _continuousMoveBaseSpeed;
-            set => _continuousMoveBaseSpeed = Mathf.Clamp(value, 0.0f, 100.0f);
-        }
-        internal static float _continuousMoveBaseSpeed = 2.5f;
-
-        /// <summary>
-        /// Sprint coefficient to use when using continuous movement.
-        /// </summary>
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.move.continuous.sprint_coefficient", 2.0f)]
-        private static float ContinuousMoveSprintCoefficient {
-            get => _continuousMoveSprintCoefficient;
-            set => _continuousMoveSprintCoefficient = Mathf.Clamp(value, 1.0f, 10.0f);
-        }
-        internal static float _continuousMoveSprintCoefficient = 2.0f;
-
-        /// <summary>
-        /// Jump velocity.
-        /// </summary>
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.move.continuous.jump_velocity", 3.5f)]
-        private static float ContinuousMoveJumpVelocity {
-            get => _continuousMoveJumpVelocity;
-            set => _continuousMoveJumpVelocity = Mathf.Max(value, 0.0f);
-        }
-        internal static float _continuousMoveJumpVelocity = 3.5f;
-
-        // turn:
-
-        /// <summary>
-        /// When equal to `<c>smooth</c>`, smooth continuous turn is enabled.
-        /// When equal to `<c>snap</c>`, snap turn is enabled.
-        /// </summary>
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.turn.type", "smooth")]
-        private static string TurnType {
-            get => _turnType.ToString().ToLower();
-            set {
-                if (Enum.TryParse(typeof(XRTurnType), value, true, out object turnTypeObj)) {
-                    XRTurnType turnType = (XRTurnType)turnTypeObj;
-                    if (turnType != _turnType) {
-                        _turnType = turnType;
-                        if (instance != null) {
-                            instance.UpdateTurnController();
-                        }
-                    }
-                }
-            }
-        }
-        private static XRTurnType _turnType = XRTurnType.Smooth;
-
-        /// <summary>
-        /// Snap-turn angle.
-        /// </summary>
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.turn.snap.angle", 90.0f)]
-        private static float SnapTurnAngle {
-            get => _snapTurnAngle;
-            set => _snapTurnAngle = Mathf.Clamp(value, 0.0f, 360.0f);
-        }
-        internal static float _snapTurnAngle = 90.0f;
-
-        /// <summary>
-        /// Snap-turn cooldown.
-        /// </summary>
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.turn.snap.cooldown", 0.1f)]
-        private static float SnapTurnCooldown {
-            get => _snapTurnCooldown;
-            set => _snapTurnCooldown = Mathf.Clamp01(value);
-        }
-        internal static float _snapTurnCooldown = 0.1f;
-
-        /// <summary>
-        /// Smooth-turn angular speed (in degrees).
-        /// </summary>
-        [ConfigurationEntry(XRManager.XRConfigName, "xr.locomotion.turn.smooth.angular_speed", 120.0f)]
-        private static float TurnBaseSpeed {
-            get => _turnBaseSpeed;
-            set => _turnBaseSpeed = Mathf.Clamp(value, 0.0f, 720.0f);
+        public XRMovementProvider MovementProvider {
+            get => movementProvider;
+            set => movementProvider = value;
         }
 
-        internal static float _turnBaseSpeed = 120.0f;
+        public XRTurnProvider TurnProvider {
+            get => turnProvider;
+            set => turnProvider = value;
+        }
 
         #endregion
 
@@ -448,7 +301,6 @@ namespace BlackTundra.World.XR {
             origin = GetComponent<XROrigin>();
             controller = GetComponent<CharacterController>();
             UpdateForwardDirection();
-            ResetProviders();
             UpdatePositionRotation();
         }
 
@@ -524,15 +376,6 @@ namespace BlackTundra.World.XR {
 
         #endregion
 
-        #region ResetProviders
-
-        private void ResetProviders() {
-            UpdateMoveController();
-            UpdateTurnController();
-        }
-
-        #endregion
-
         #region ConfigureCamera
 
         private void ConfigureCamera() {
@@ -553,7 +396,6 @@ namespace BlackTundra.World.XR {
         public ControlFlags OnControlGained() {
             controlled = true;
             UpdateInputActionReferences();
-            ResetProviders();
             ConfigureCamera();
             QualitySettings.SetQualityLevel(QualitySettings.GetQualityLevel());
             QualitySettings.lodBias *= LODIncrease; // for some reason the LOD bias gets shrank while in VR
@@ -580,8 +422,8 @@ namespace BlackTundra.World.XR {
         private void Update() {
             float deltaTime = Time.deltaTime;
             if (controlled) {
-                if (turnController != null) turnController.Update(deltaTime);
-                if (moveController != null) moveController.Update(deltaTime);
+                if (turnProvider != null) turnProvider.Update(deltaTime);
+                if (movementProvider != null) movementProvider.Update(deltaTime);
             }
             UpdatePositionRotation();
         }
@@ -593,7 +435,7 @@ namespace BlackTundra.World.XR {
         private void FixedUpdate() {
             float deltaTime = Time.fixedDeltaTime;
             if (controlled) {
-                if (moveController != null) moveController.FixedUpdate(deltaTime);
+                if (movementProvider != null) movementProvider.FixedUpdate(deltaTime);
             }
             UpdatePhysics(deltaTime);
             UpdateCharacterController(deltaTime);
@@ -647,19 +489,34 @@ namespace BlackTundra.World.XR {
             // environmental physics:
             if (_grounded) {
                 if (physicsVelocity.y > 0.0f && physicsInstantVelocity.y < 0.0f) physicsInstantVelocity.y = 0.0f; // remove instant negative y velocity
-                float dragCoefficient = 1.0f - (_dragGround * deltaTime);
+                float dragCoefficient = 1.0f - (GroundedVelocityDampenFactor * deltaTime);
                 physicsVelocity *= dragCoefficient;
                 if (physicsVelocity.y < 0.0f) physicsVelocity.y = 0.0f; // do not allow downwards velocity while grounded
             } else {
-                float dragCoefficient = -_dragAir * deltaTime;
+                // find rho:
+                float rho = Environment.RhoAt(transform.position);
+                // calculate the vertical (top-down) area:
+                float verticalArea = _radius * _radius * Mathf.PI;
+                // calculate the horizontal (front) area:
+                float horizontalArea = verticalArea + (_radius * Mathf.Max(_height - _radius - _radius, 0.0f));
+                // combine the drag coefficient with rho and delta time:
+                float combinedDragCoefficient = HalfNegativeDragCoefficient * rho * deltaTime;
+                // calculate the vertical (Y) drag coefficient:
+                float verticalDragCoefficient = combinedDragCoefficient * verticalArea;
+                // calculate the horizontal (XZ) drag coefficient:
+                float horizontalDragCoefficient = combinedDragCoefficient * horizontalArea;
                 if (useGravity) {
                     physicsVelocity += new Vector3(
-                        physicsVelocity.x * dragCoefficient,
-                        physicsVelocity.y * dragCoefficient - (Environment.gravity * deltaTime),
-                        physicsVelocity.z * dragCoefficient
+                        Mathf.Sign(physicsVelocity.x) * physicsVelocity.x * physicsVelocity.x * horizontalDragCoefficient,
+                        (Mathf.Sign(physicsVelocity.y) * physicsVelocity.y * physicsVelocity.y * verticalDragCoefficient) - (Environment.gravity * deltaTime),
+                        Mathf.Sign(physicsVelocity.z) * physicsVelocity.z * physicsVelocity.z * horizontalDragCoefficient
                     );
                 } else {
-                    physicsVelocity *= 1.0f + dragCoefficient;
+                    physicsVelocity += new Vector3(
+                        physicsVelocity.x * physicsVelocity.x * horizontalDragCoefficient,
+                        physicsVelocity.y * physicsVelocity.y * verticalDragCoefficient,
+                        physicsVelocity.z * physicsVelocity.z * horizontalDragCoefficient
+                    );
                 }
             }
         }
@@ -820,30 +677,6 @@ namespace BlackTundra.World.XR {
 
         #endregion
 
-        #region UpdateMoveController
-
-        private void UpdateMoveController() {
-            moveController = _moveType switch {
-                XRMoveType.Smooth => new XRContinuousMoveController(this),
-                XRMoveType.Teleport => new XRTeleportMoveController(this),
-                _ => null
-            };
-        }
-
-        #endregion
-
-        #region UpdateTurnController
-
-        private void UpdateTurnController() {
-            turnController = _turnType switch {
-                XRTurnType.Smooth => new XRSmoothTurnController(this),
-                XRTurnType.Snap => new XRSnapTurnController(this),
-                _ => null
-            };
-        }
-
-        #endregion
-
         #region SetMoveVelocity
 
         internal void SetMoveVelocity(in Vector3 velocity) {
@@ -860,11 +693,11 @@ namespace BlackTundra.World.XR {
         public void AddForce(in Vector3 force, in ForceMode forceMode) {
             switch (forceMode) {
                 case ForceMode.Force: {
-                    physicsTimeDependentDeltaVelocity += force * _inverseMass;
+                    physicsTimeDependentDeltaVelocity += force * InverseMass;
                     break;
                 }
                 case ForceMode.Impulse: {
-                    physicsVelocity += force * _inverseMass;
+                    physicsVelocity += force * InverseMass;
                     break;
                 }
                 case ForceMode.Acceleration: {

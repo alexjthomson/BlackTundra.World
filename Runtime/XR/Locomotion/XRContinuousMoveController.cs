@@ -7,7 +7,7 @@ using UnityEngine.InputSystem;
 
 namespace BlackTundra.World.XR.Locomotion {
 
-    public sealed class XRContinuousMoveController : XRMoveController {
+    public class XRContinuousMoveController : XRMovementProvider {
 
         #region constant
 
@@ -27,6 +27,12 @@ namespace BlackTundra.World.XR.Locomotion {
 
         #region variable
 
+        public float baseSpeed = 2.5f;
+
+        public float sprintSpeedMultiplier = 2.0f;
+
+        public float jumpSpeed = 3.5f;
+
         private readonly InputAction moveAction;
         private Vector2 inputMove;
 
@@ -45,7 +51,7 @@ namespace BlackTundra.World.XR.Locomotion {
 
         #region constructor
 
-        internal XRContinuousMoveController(in XRLocomotionController locomotion) : base(locomotion) {
+        public XRContinuousMoveController(in XRLocomotionController locomotion) : base(locomotion) {
             moveAction = locomotion.inputMoveAction;
             jumpAction = locomotion.inputJumpAction;
             sprintAction = locomotion.inputSprintAction;
@@ -83,12 +89,12 @@ namespace BlackTundra.World.XR.Locomotion {
             float heightCoefficient = Mathf.Lerp(locomotion.minHeight, HeightMoveSpeedDamperThreshold, locomotion.height) / HeightMoveSpeedDamperThreshold;
             heightCoefficient = Mathf.Clamp(heightCoefficient * heightCoefficient, 0.1f, 1.0f);
             // movement speed:
-            float movementSpeed = heightCoefficient * XRLocomotionController._continuousMoveBaseSpeed;
+            float movementSpeed = heightCoefficient * baseSpeed;
             // sprint:
             sprintCoefficient.Apply(inputSprint, SprintSmoothing * deltaTime);
             float sprintValue = sprintCoefficient.value;
             if (sprintValue > 0.0f) {
-                float sprintCoefficient = Mathf.Lerp(1.0f, XRLocomotionController._continuousMoveSprintCoefficient, sprintValue);
+                float sprintCoefficient = Mathf.Lerp(1.0f, sprintSpeedMultiplier, sprintValue);
                 movementSpeed *= sprintCoefficient;
             }
             // base movement:
@@ -102,7 +108,7 @@ namespace BlackTundra.World.XR.Locomotion {
             // jump:
             if (inputJump > 0.5f) {
                 if (locomotion.grounded && !jumpPressed && jumpCooldownTimer == 0.0f) {
-                    Vector3 jumpVelocity = new Vector3(0.0f, XRLocomotionController._continuousMoveJumpVelocity, 0.0f);
+                    Vector3 jumpVelocity = new Vector3(0.0f, jumpSpeed, 0.0f);
                     locomotion.AddForce(jumpVelocity, ForceMode.VelocityChange);
                     jumpCooldownTimer = JumpCooldownTime;
                 }

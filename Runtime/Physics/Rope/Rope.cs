@@ -64,16 +64,6 @@ namespace BlackTundra.World {
         private float forceScale = 50.0f;
 
         /// <summary>
-        /// Limits the amount of elastic force that can be applied to an object attached to this rope.
-        /// This can be any positive number. This limits the amount the rope has extended past the <see cref="maxLength"/> squared.
-        /// </summary>
-#if UNITY_EDITOR
-        [Min(0.0f)]
-#endif
-        [SerializeField]
-        private float upperElasticClamp = 1.0f;
-
-        /// <summary>
         /// Max calulcated length of the rope before tension is applied.
         /// </summary>
         private float maxLength = 0.0f;

@@ -912,7 +912,7 @@ namespace BlackTundra.World.Actors {
         /// <param name="damage">Numerical value for the amount of damage to deal.</param>
         /// <param name="data">Any data sent along with the damage, this can be <c>null</c> if there is no data.</param>
         /// <returns>Returns the actual amount of damage received by the <see cref="Actor"/>.</returns>
-        public float Damage(in object sender, float damage, in object data = null) {
+        public float OnDamage(in object sender, float damage, in object data = null) {
             if (behaviour == null) return 0.0f; // no damage was delt
             return behaviour.OnActorDamaged(sender, damage, data);
         }

@@ -2,7 +2,7 @@
 
 namespace BlackTundra.World.XR.Locomotion {
 
-    public sealed class XRSnapTurnController : XRTurnController {
+    public sealed class XRSnapTurnController : XRTurnProvider {
 
         #region variable
 

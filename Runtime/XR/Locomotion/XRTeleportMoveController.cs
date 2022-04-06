@@ -2,7 +2,7 @@
 
 namespace BlackTundra.World.XR.Locomotion {
 
-    public sealed class XRTeleportMoveController : XRMoveController {
+    public sealed class XRTeleportMoveController : XRMovementProvider {
 
         #region variable
 

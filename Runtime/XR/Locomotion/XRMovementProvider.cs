@@ -4,12 +4,12 @@ using System;
 
 namespace BlackTundra.World.XR.Locomotion {
 
-    public abstract class XRMoveController {
+    public abstract class XRMovementProvider {
 
         #region variable
 
         /// <summary>
-        /// <see cref="XRLocomotionController"/> that the <see cref="XRMoveController"/> should control.
+        /// <see cref="XRLocomotionController"/> that the <see cref="XRMovementProvider"/> should control.
         /// </summary>
         protected readonly XRLocomotionController locomotion;
 
@@ -17,7 +17,7 @@ namespace BlackTundra.World.XR.Locomotion {
 
         #region constructor
 
-        protected XRMoveController(in XRLocomotionController locomotion) {
+        protected XRMovementProvider(in XRLocomotionController locomotion) {
             if (locomotion == null) throw new ArgumentNullException(nameof(locomotion));
             this.locomotion = locomotion;
         }

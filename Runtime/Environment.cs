@@ -4,8 +4,13 @@ using System;
 
 using UnityEngine;
 
+using Object = UnityEngine.Object;
+
 namespace BlackTundra.World {
 
+    /// <summary>
+    /// Manages the environment including resistance (rho), wind direction and force, gravity, environmental forces, and more.
+    /// </summary>
     public static class Environment {
 
         #region constant
@@ -23,7 +28,7 @@ namespace BlackTundra.World {
         /// <summary>
         /// Temperature lapse rate for dry air in K/m.
         /// </summary>
-        public static float TemperatureLapseRateAir = 0.00976f;
+        public static float TemperatureLapseRateAir = 0.0065f;
 
         /// <summary>
         /// Height above sea level where rho of air will be modelled as a linear relationship between rho at this altitude (in meters) and
@@ -35,13 +40,35 @@ namespace BlackTundra.World {
 
         #region variable
 
+        /// <summary>
+        /// Power to raise part of the rho air equation to.
+        /// </summary>
         private static float rhoAirPower = 0.0f;
 
-        private static float rhoAirCoefficient = 1.0f;
+        /// <summary>
+        /// L/T where L = temperature lapse rate (<see cref="TemperatureLapseRateAir"/>), and T = sea level standard temperature
+        /// (<see cref="SeaLevelStandardTemperature"/>).
+        /// </summary>
+        private static float rhoAirTemperatureLapseRateBySeaLevelTemperature = 1.0f;
 
+        /// <summary>
+        /// pM/RT where p = sea level standard atmospheric pressure, M = molar mass of dry air (<see cref="MolarMassAir"/>),
+        /// R = ideal universal gas constant (<see cref="UniversalGasConstant"/>), T = sea level standard temperature
+        /// (<see cref="SeaLevelStandardTemperature"/>).
+        /// </summary>
+        private static float rhoAirPressureToDensity = 0.0f;
+
+        /// <summary>
+        /// Rho air calculated at sea level.
+        /// </summary>
         private static float rhoAirSeaLevel = 0.0f;
 
         private static float rhoAirAltitudeLerpCoefficient = 0.0f;
+
+        /// <summary>
+        /// Global <see cref="WindZone"/>.
+        /// </summary>
+        private static WindZone globalWindZone = null;
 
         #endregion
 
@@ -67,6 +94,9 @@ namespace BlackTundra.World {
         }
         private static float _seaHeight = 0.0f;
 
+        /// <summary>
+        /// Sea level atmospheric pressure in Pascal.
+        /// </summary>
         public static float SeaLevelAtmosphericPressure {
             get => _seaLevelAtmosphericPressure;
             set {
@@ -90,9 +120,86 @@ namespace BlackTundra.World {
         }
         private static float _seaLevelStandardTemperature = 288.16f;
 
+        /// <summary>
+        /// Normalized direction that the global <see cref="WindZone"/> is facing.
+        /// </summary>
+        public static Vector3 WindDirection {
+            get => _windDirection;
+            set {
+                _windDirection = new Vector3(value.x, 0.0f, value.z).normalized;
+                _windForce = _windForceMagnitude * _windDirection;
+                if (globalWindZone != null) {
+                    globalWindZone.transform.rotation = Quaternion.LookRotation(_windDirection, Vector3.up);
+                }
+            }
+        }
+        private static Vector3 _windDirection = Vector3.forward;
+
+        /// <summary>
+        /// Wind force magnitude.
+        /// </summary>
+        public static float WindForceMagnitude {
+            get => _windForceMagnitude;
+            set {
+                if (value > 0.0f) {
+                    _windForceMagnitude = value;
+                    _windForce = value * _windDirection;
+                } else {
+                    _windForceMagnitude = 0.0f;
+                    _windForce = Vector3.zero;
+                }
+                if (globalWindZone != null) UpdateGlobalWindZone();
+            }
+        }
+        private static float _windForceMagnitude = 0.0f;
+
+        /// <summary>
+        /// Wind force.
+        /// </summary>
+        public static Vector3 WindForce {
+            get => _windForce;
+            set {
+                float magnitude = value.magnitude;
+                WindDirection = value * (1.0f / magnitude);
+                WindForceMagnitude = magnitude;
+            }
+        }
+        internal static Vector3 _windForce = Vector3.zero;
+
         #endregion
 
         #region logic
+
+        #region Initialise
+
+        [CoreInitialise]
+        private static void Initialise() {
+            // create global wind zone:
+            GameObject gameObject = new GameObject(
+                "_GlobalWindZone",
+                typeof(WindZone)
+            ) {
+                layer = 2,
+                isStatic = false,
+            };
+            globalWindZone = gameObject.GetComponent<WindZone>();
+            globalWindZone.mode = WindZoneMode.Directional;
+            Object.DontDestroyOnLoad(gameObject);
+            UpdateGlobalWindZone();
+        }
+
+        #endregion
+
+        #region UpdateGlobalWindZone
+
+        private static void UpdateGlobalWindZone() {
+            globalWindZone.windMain = _windForceMagnitude;
+            globalWindZone.windTurbulence = 0.25f + (_windForceMagnitude * 0.01f);
+            globalWindZone.windPulseMagnitude = 0.5f + (_windForceMagnitude * 0.0073f);
+            globalWindZone.windPulseFrequency = Mathf.Lerp(0.01f, 0.001f, _windForceMagnitude * 0.0001f);
+        }
+
+        #endregion
 
         #region RecalculateConstants
 
@@ -103,8 +210,9 @@ namespace BlackTundra.World {
             // calculate values required for calculating rho of air by elevation:
             // https://en.wikipedia.org/wiki/Atmospheric_pressure
             rhoAirPower = (_gravity * MolarMassAir) / (UniversalGasConstant * TemperatureLapseRateAir);
-            rhoAirCoefficient = TemperatureLapseRateAir / _seaLevelStandardTemperature;
+            rhoAirTemperatureLapseRateBySeaLevelTemperature = TemperatureLapseRateAir / _seaLevelStandardTemperature;
             rhoAirSeaLevel = RhoAir(0.0f);
+            rhoAirPressureToDensity = (_seaLevelAtmosphericPressure * MolarMassAir) / (UniversalGasConstant * SeaLevelStandardTemperature);
             float rhoAirAltitude = RhoAir(RhoAirSeaLevelApproxHeight);
             rhoAirAltitudeLerpCoefficient = (rhoAirAltitude - rhoAirSeaLevel) / RhoAirSeaLevelApproxHeight;
         }
@@ -130,7 +238,7 @@ namespace BlackTundra.World {
 
         #endregion
 
-        #region RhoAir
+        #region RhoAirApprox
 
         /// <summary>
         /// Approximates rho of air when <paramref name="heightAboveSeaLevel"/> is below <see cref="RhoAirSeaLevelApproxHeight"/>.
@@ -155,7 +263,12 @@ namespace BlackTundra.World {
         /// <summary>
         /// Calculates the value of rho of air at a certain <paramref name="heightAboveSeaLevel"/>.
         /// </summary>
-        public static float RhoAir(in float heightAboveSeaLevel) => _seaLevelAtmosphericPressure * Mathf.Pow(1.0f - (rhoAirCoefficient * heightAboveSeaLevel), rhoAirPower);
+        public static float RhoAir(in float heightAboveSeaLevel) {
+            return rhoAirPressureToDensity * Mathf.Pow(
+                1.0f - (rhoAirTemperatureLapseRateBySeaLevelTemperature * heightAboveSeaLevel),
+                rhoAirPower
+            );
+        }
 
         #endregion
 

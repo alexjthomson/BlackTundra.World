@@ -220,6 +220,13 @@ namespace BlackTundra.World.XR {
         /// </summary>
         [SerializeField]
         private float minGripAngle = 30.0f;
+
+        /// <summary>
+        /// Maximum velocity that can be exerted to the hand while gripping an object.
+        /// </summary>
+        [SerializeField]
+        private float maxGripVelocity = 2.5f;
+
         #endregion
 
         #region Input
@@ -780,6 +787,8 @@ namespace BlackTundra.World.XR {
                 Vector3 velocity = (handPosition - lastPositionPhysics) * (1.0f / deltaTime); // estimate the velocity of the hand
                 Vector3 predictedPosition = handPosition + (velocity * GripMoveTime); // predict the position of the hand in the future
                 Vector3 moveVector = (gripPosition - predictedPosition) * GripInverseMoveTime; // calculate the velocity change required to reach the target position
+                float sqrMoveVectorMagnitude = moveVector.sqrMagnitude; // get move vector magnitude
+                if (sqrMoveVectorMagnitude > maxGripVelocity * maxGripVelocity) moveVector *= maxGripVelocity / Mathf.Sqrt(sqrMoveVectorMagnitude); // clamp move vector magnitude
                 _locomotion.AddForce(moveVector * 0.5f, ForceMode.VelocityChange); // apply velocity change to the locomotion controller
                 gripTracker.AddForceAtPosition(moveVector * -0.5f, gripPosition, ForceMode.Impulse); // apply opposing force to gripped object
             }

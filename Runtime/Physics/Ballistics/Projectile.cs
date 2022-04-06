@@ -322,6 +322,14 @@ namespace BlackTundra.World.Ballistics {
 
         private void RegisterHit(in RaycastHit hit, in Vector3 direction, in ProjectileHitType hitType, in float energyTransferred) {
             Collider collider = hit.collider;
+            // damage:
+            IDamageable damageable = collider.GetComponentInParent<IDamageable>();
+            if (damageable != null) { // object is damageable
+                damageable.OnDamage(
+                    this,
+                    energyTransferred * _properties.damageCoefficient
+                );
+            }
             // impact:
             IImpactable impactable = collider.GetComponentInParent<IImpactable>(); // check if the object is impactable
             if (impactable != null) { // object is impactable

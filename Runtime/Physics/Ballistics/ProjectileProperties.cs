@@ -62,7 +62,7 @@ namespace BlackTundra.World.Ballistics {
         internal float penetrationPower = 0.1f;
 
         /// <summary>
-        /// Damage coefficient that the <see cref="Projectile"/> uses to inflict damage on struck objects.
+        /// Coefficient used to convert energy transferred into damage delt to objects hit by the <see cref="Projectile"/>.
         /// </summary>
 #if UNITY_EDITOR
         [Min(0.0f)]
