@@ -248,7 +248,8 @@ namespace BlackTundra.World.XR {
 
         public Vector3 position { get; private set; } = Vector3.zero;
         public Quaternion rotation { get; private set; } = Quaternion.identity;
-        public Vector3 velocity => controller.velocity;
+        public Vector3 velocity => _velocity;
+        internal Vector3 _velocity = Vector3.zero;
         public Vector3 centreOfMass { get; private set; }
         public Vector3 HeadPosition { get; private set; } = Vector3.zero;
         public Quaternion HeadRotation { get; private set; } = Quaternion.identity;
@@ -525,12 +526,33 @@ namespace BlackTundra.World.XR {
 
         #region ApplyVelocity
 
-        private void ApplyVelocity(in float deltaTime) {
+        private void ApplyVelocity(in float deltaTime, in float inverseDeltaTime) {
+            if (deltaTime < Mathf.Epsilon) return;
+            // find the forwards vector to move along:
             Vector3 forward = forwardTransform.forward;
+            // find the rotation of the locomotion controller in degrees:
             float degrees = Vector2.SignedAngle(Vector2.up, new Vector2(forward.x, forward.z));
+            // create a forward rotation quaternion:
             Quaternion forwardRotation = Quaternion.Euler(0.0f, -degrees, 0.0f);
+            // calculate the target velocity to move at:
             Vector3 velocity = (forwardRotation * moveVelocity) + physicsVelocity + physicsInstantVelocity;
-            controller.Move(velocity * deltaTime);
+            // calculate the movement vector:
+            Vector3 movementVector = velocity * deltaTime;
+            // find the position of the controller before the movement update:
+            Vector3 lastPosition = transform.position;
+            // move the controller:
+            controller.Move(movementVector);
+            // find the new position of the controller after the movement update:
+            Vector3 currentPosition = transform.position;
+            // calculate the actual movement vector:
+            Vector3 actualMovementVector = currentPosition - lastPosition;
+            // convert this to a velocity:
+            Vector3 actualVelocity = actualMovementVector * inverseDeltaTime;
+            // extract the actual value of the physics velocity from this actual velocity:
+            Vector3 targetPhysicsVelocity = actualVelocity - (velocity - physicsVelocity);
+            if (physicsVelocity.y < Mathf.Epsilon) targetPhysicsVelocity.y = physicsVelocity.y; // clamp negative y (since this is used by the gravity stick force)
+            // update the physics velocity:
+            physicsVelocity = targetPhysicsVelocity;
         }
 
         #endregion
@@ -541,6 +563,8 @@ namespace BlackTundra.World.XR {
         /// Updates the <see cref="controller"/> to match with the position of the XR eyes (camera).
         /// </summary>
         private void UpdateCharacterController(in float deltaTime) {
+            if (deltaTime < Mathf.Epsilon) return;
+            float inverseDeltaTime = 1.0f / deltaTime;
             // get controller properties:
             float height = controller.height;
             float radius = controller.radius;
@@ -657,7 +681,10 @@ namespace BlackTundra.World.XR {
             _height = targetHeight;
             _radius = actualRadius;
             // apply velocity:
-            ApplyVelocity(deltaTime);
+            ApplyVelocity(deltaTime, inverseDeltaTime);
+            // calculate the final velocity:
+            newPosition = transform.position;
+            _velocity = (newPosition - position) * inverseDeltaTime;
         }
 
         #endregion

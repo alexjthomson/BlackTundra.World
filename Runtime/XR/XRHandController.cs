@@ -445,12 +445,12 @@ namespace BlackTundra.World.XR {
         /// <summary>
         /// Raw velocity of the <see cref="XRHandController"/>.
         /// </summary>
-        public Vector3 velocity => _localVelocity + _locomotion.velocity;
+        public Vector3 velocity => _localVelocity + _locomotion._velocity;
 
         /// <summary>
         /// Smooth velocity of the <see cref="XRHandController"/>.
         /// </summary>
-        public Vector3 smoothVelocity => _smoothLocalVelocity + _locomotion.velocity;
+        public Vector3 smoothVelocity => _smoothLocalVelocity + _locomotion._velocity;
 
         #endregion
 
@@ -998,7 +998,7 @@ namespace BlackTundra.World.XR {
                 ReleaseHeldItem(interactable);
                 Rigidbody rigidbody = interactable.GetComponent<Rigidbody>();
                 if (rigidbody != null) {
-                    rigidbody.velocity = _smoothLocalVelocity * interactable.throwVelocityScale;
+                    rigidbody.velocity = (_smoothLocalVelocity + _locomotion._velocity) * interactable.throwVelocityScale;
                     rigidbody.angularVelocity = Vector3.zero;
                 }
             }
