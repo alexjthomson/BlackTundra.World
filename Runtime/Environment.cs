@@ -170,9 +170,26 @@ namespace BlackTundra.World {
 
         #region logic
 
+        #region RecalculateConstants
+
+        [CoreInitialise(-65000)]
+        private static void RecalculateConstants() {
+            // rho air:
+            // calculate values required for calculating rho of air by elevation:
+            // https://en.wikipedia.org/wiki/Atmospheric_pressure
+            rhoAirPower = (_gravity * MolarMassAir) / (UniversalGasConstant * TemperatureLapseRateAir);
+            rhoAirTemperatureLapseRateBySeaLevelTemperature = TemperatureLapseRateAir / _seaLevelStandardTemperature;
+            rhoAirSeaLevel = RhoAir(0.0f);
+            rhoAirPressureToDensity = (_seaLevelAtmosphericPressure * MolarMassAir) / (UniversalGasConstant * SeaLevelStandardTemperature);
+            float rhoAirAltitude = RhoAir(RhoAirSeaLevelApproxHeight);
+            rhoAirAltitudeLerpCoefficient = (rhoAirAltitude - rhoAirSeaLevel) / RhoAirSeaLevelApproxHeight;
+        }
+
+        #endregion
+
         #region Initialise
 
-        [CoreInitialise]
+        [CoreInitialise(-60000)]
         private static void Initialise() {
             // create global wind zone:
             GameObject gameObject = new GameObject(
@@ -197,24 +214,6 @@ namespace BlackTundra.World {
             globalWindZone.windTurbulence = 0.25f + (_windForceMagnitude * 0.01f);
             globalWindZone.windPulseMagnitude = 0.5f + (_windForceMagnitude * 0.0073f);
             globalWindZone.windPulseFrequency = Mathf.Lerp(0.01f, 0.001f, _windForceMagnitude * 0.0001f);
-        }
-
-        #endregion
-
-        #region RecalculateConstants
-
-        [CoreInitialise]
-        private static void RecalculateConstants() {
-
-            // rho air:
-            // calculate values required for calculating rho of air by elevation:
-            // https://en.wikipedia.org/wiki/Atmospheric_pressure
-            rhoAirPower = (_gravity * MolarMassAir) / (UniversalGasConstant * TemperatureLapseRateAir);
-            rhoAirTemperatureLapseRateBySeaLevelTemperature = TemperatureLapseRateAir / _seaLevelStandardTemperature;
-            rhoAirSeaLevel = RhoAir(0.0f);
-            rhoAirPressureToDensity = (_seaLevelAtmosphericPressure * MolarMassAir) / (UniversalGasConstant * SeaLevelStandardTemperature);
-            float rhoAirAltitude = RhoAir(RhoAirSeaLevelApproxHeight);
-            rhoAirAltitudeLerpCoefficient = (rhoAirAltitude - rhoAirSeaLevel) / RhoAirSeaLevelApproxHeight;
         }
 
         #endregion

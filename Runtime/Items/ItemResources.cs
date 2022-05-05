@@ -42,7 +42,7 @@ namespace BlackTundra.World.Items {
 
         #region Initialise
 
-        [CoreInitialise(int.MinValue)]
+        [CoreInitialise(-75000)]
         private static void Initialise() {
             if (instance == null) {
                 ResourceReference<ItemResources> resource = new ResourceReference<ItemResources>(ResourcePath);

@@ -104,7 +104,7 @@ namespace BlackTundra.World.Items {
         /// <summary>
         /// Initialises the <see cref="ItemData"/> database.
         /// </summary>
-        [CoreInitialise(int.MinValue + 1)] // this must be executed after ItemResources
+        [CoreInitialise(-70000)] // this must be executed after ItemResources
         private static void InitialiseItemDatabase() {
             try {
                 ReloadDatabase();

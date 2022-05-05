@@ -49,7 +49,7 @@ namespace BlackTundra.World {
 
         #region Initialise
 
-        [CoreInitialise]
+        [CoreInitialise(-80000)]
         private static void Initialise() {
             MaterialDatabase database = ResourceReference.Value;
             if (database == null) {

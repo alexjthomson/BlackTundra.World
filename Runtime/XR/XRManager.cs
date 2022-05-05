@@ -94,7 +94,7 @@ namespace BlackTundra.World.XR {
 
         #region Initialise
 
-        [CoreInitialise(int.MinValue + 1)]
+        [CoreInitialise(-50000)]
         private static void Initialise() {
             xrLaunchFlag = Core.HasLaunchFlag(LaunchFlag);
             UpdateState();
