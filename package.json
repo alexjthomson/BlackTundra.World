@@ -1,43 +1,41 @@
 {
-  "name": "com.blacktundra.world",
-  "version": "2.0.0",
-  "displayName": "World",
-  "description": "Tools used for creating an imersive 3D environment.",
-  "unity": "2020.1",
-  "type": "library",
-  "hideInEditor": false,
-  "keywords": [
-    "world",
-    "path",
-    "road",
-    "sky",
-    "environment",
-    "weather",
-    "time"
-  ],
-  "author": {
-    "name": "Black Tundra",
-    "email": "contact@blacktundra.com",
-    "url": "https://blacktundra.com"
-  },
-  "dependencies": {
-    "com.blacktundra.foundation": "2.0.1"
-  },
-  "samples": [
-    {
-      "displayName": "Audio Mixer",
-      "description": "Pre-configured AudioMixer resource.",
-      "path": "Samples~/AudioMixer"
-    },
-	{
-      "displayName": "Camera Controller",
-      "description": "Pre-made camera controller prefab.",
-      "path": "Samples~/CameraController"
-    },
-	{
-      "displayName": "XR Controller",
-      "description": "Fully setup XR controller.",
-      "path": "Samples~/XRController"
-    }
-  ]
+	"name": "com.blacktundra.world",
+	"version": "2.0.0",
+	"displayName": "World",
+	"description": "Tools used for creating an imersive 3D environment.",
+	"unity": "2020.1",
+	"type": "library",
+	"hideInEditor": false,
+	"author": {
+		"name": "Alex Thomson",
+		"email": "alexjthomson1882@gmail.com",
+		"url": "https://github.com/alexjthomson1882"
+	},
+	"keywords": [
+		"world",
+		"environment",
+		"xr",
+		"vr",
+		"player"
+	],
+	"dependencies": {
+		"com.blacktundra.foundation": "2.0.1"
+	},
+	"samples": [
+		{
+			"displayName": "Audio Mixer",
+			"description": "Pre-configured AudioMixer resource.",
+			"path": "Samples~/AudioMixer"
+		},
+		{
+			"displayName": "Camera Controller",
+			"description": "Pre-made camera controller prefab.",
+			"path": "Samples~/CameraController"
+		},
+		{
+			"displayName": "XR Controller",
+			"description": "Fully setup XR controller.",
+			"path": "Samples~/XRController"
+		}
+	]
 }
