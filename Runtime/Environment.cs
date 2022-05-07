@@ -193,11 +193,12 @@ namespace BlackTundra.World {
         private static void Initialise() {
             // create global wind zone:
             GameObject gameObject = new GameObject(
-                "_GlobalWindZone",
+                "__GlobalWindZone",
                 typeof(WindZone)
             ) {
                 layer = 2,
                 isStatic = false,
+                hideFlags = HideFlags.HideAndDontSave
             };
             globalWindZone = gameObject.GetComponent<WindZone>();
             globalWindZone.mode = WindZoneMode.Directional;
