@@ -62,12 +62,6 @@ namespace BlackTundra.World.Ragdoll {
         private float reactionCoefficient = 1.0f;
 
         /// <summary>
-        /// How far into the future to look ahead to predict the amount of torque required to stop on the exact required spot.
-        /// </summary>
-        [SerializeField]
-        private float lookAheadTime = 0.05f;
-
-        /// <summary>
         /// <see cref="Rigidbody"/> component attached to the same <see cref="GameObject"/> as the <see cref="ActiveRagdollTorqueJointController"/>.
         /// </summary>
 #if UNITY_EDITOR
@@ -131,12 +125,6 @@ namespace BlackTundra.World.Ragdoll {
             Vector3 targetAngularVelocity = angularDisplacement * (reactionCoefficient / deltaTime);
             // calculate difference between current angular velocity and target angular velocity:
             Vector3 deltaAngularVelocity = targetAngularVelocity - currentAngularVelocity; // current -> target in rad/s
-
-            // calculate look ahead rotation:
-
-            //Quaternion.AngleAxis();
-
-
             // sanitize:
             if (deltaAngularVelocity.IsNaN()) return; // do not put the joint into an unstable state
             // clamp delta angular velocity:
