@@ -39,6 +39,30 @@ namespace BlackTundra.World.Damagers {
         /// </summary>
         internal readonly List<BaseDamager> damagers = new List<BaseDamager>();
 
+        /// <summary>
+        /// Original <see cref="Transform"/> that the <see cref="RigidbodyDamageController"/> was parented to.
+        /// </summary>
+        private Transform originalParent = null;
+
+        #endregion
+
+        #region property
+
+        /// <inheritdoc cref="originalParent"/>
+        public Transform OriginalParent => originalParent;
+
+        /// <summary>
+        /// Current parent of the <see cref="RigidbodyDamageController"/>.
+        /// </summary>
+        public Transform CurrentParent => transform.parent;
+
+        /// <summary>
+        /// <c>true</c> if the <see cref="RigidbodyDamageController"/> is parented to the original parent.
+        /// This may also return <c>true</c> if the original parent was destroyed and the <see cref="RigidbodyDamageController"/>
+        /// also does not have a parent.
+        /// </summary>
+        public bool HasOriginalParent => transform.parent == originalParent;
+
         #endregion
 
         #region logic
@@ -46,6 +70,7 @@ namespace BlackTundra.World.Damagers {
         #region Awake
 
         private void Awake() {
+            originalParent = transform.parent;
             rigidbody = GetComponent<Rigidbody>();
         }
 
