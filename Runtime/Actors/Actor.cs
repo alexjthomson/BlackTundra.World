@@ -910,11 +910,14 @@ namespace BlackTundra.World.Actors {
         /// </summary>
         /// <param name="sender">Sender/invoker of the damage.</param>
         /// <param name="damage">Numerical value for the amount of damage to deal.</param>
+        /// <param name="damageType">Type of damage being inflicted.</param>
+        /// <param name="point">World-space point that damage was delt to.</param>
+        /// <param name="direction">World-space direction that damage was delt in.</param>
         /// <param name="data">Any data sent along with the damage, this can be <c>null</c> if there is no data.</param>
         /// <returns>Returns the actual amount of damage received by the <see cref="Actor"/>.</returns>
-        public float OnDamage(in object sender, float damage, in object data = null) {
+        public float OnDamage(in object sender, float damage, DamageType damageType, in Vector3 point, in Vector3 direction, in object data = null) {
             if (behaviour == null) return 0.0f; // no damage was delt
-            return behaviour.OnActorDamaged(sender, damage, data);
+            return behaviour.OnActorDamaged(sender, damage, damageType, point, direction, data);
         }
 
         #endregion

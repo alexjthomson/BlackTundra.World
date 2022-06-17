@@ -321,13 +321,18 @@ namespace BlackTundra.World.Ballistics {
         #region RegisterHit
 
         private void RegisterHit(in RaycastHit hit, in Vector3 direction, in ProjectileHitType hitType, in float energyTransferred) {
+            Vector3 point = hit.point;
             Collider collider = hit.collider;
             // damage:
             IDamageable damageable = collider.GetComponentInParent<IDamageable>();
             if (damageable != null) { // object is damageable
                 damageable.OnDamage(
                     this,
-                    energyTransferred * _properties.damageCoefficient
+                    energyTransferred * _properties.damageCoefficient,
+                    hitType.ToDamageType(),
+                    point,
+                    direction,
+                    null
                 );
             }
             // impact:
@@ -335,7 +340,7 @@ namespace BlackTundra.World.Ballistics {
             if (impactable != null) { // object is impactable
                 impactable.OnImpact( // impact the object
                     _velocity,
-                    hit.point,
+                    point,
                     energyTransferred
                 );
             }
@@ -348,7 +353,7 @@ namespace BlackTundra.World.Ballistics {
                         1.0f / physicsObject.mass,
                         direction
                     );
-                    physicsObject.AddForceAtPosition(impactForce, hit.point, ForceMode.VelocityChange);
+                    physicsObject.AddForceAtPosition(impactForce, point, ForceMode.VelocityChange);
                 } else { // target collider is not an item
                     Rigidbody rigidbody = collider.GetComponentInParent<Rigidbody>(); // check if the target item has a rigidbody
                     if (rigidbody != null && !rigidbody.isKinematic) { // the target item does have a rididbody
@@ -358,7 +363,7 @@ namespace BlackTundra.World.Ballistics {
                             direction
                         );
                         if (!float.IsNaN(impactForce.x)) {
-                            rigidbody.AddForceAtPosition(impactForce, hit.point, ForceMode.VelocityChange);
+                            rigidbody.AddForceAtPosition(impactForce, point, ForceMode.VelocityChange);
                         }
                     }
                 }

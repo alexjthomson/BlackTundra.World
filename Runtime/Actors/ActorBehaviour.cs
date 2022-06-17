@@ -97,6 +97,9 @@ namespace BlackTundra.World.Actors {
         /// </summary>
         /// <param name="sender">Sender/invoker of the damage.</param>
         /// <param name="damage">Total damage done to the <see cref="actor"/> by the <paramref name="sender"/>.</param>
+        /// <param name="damageType">Type of damage being inflicted.</param>
+        /// <param name="point">World-space point that damage was delt to.</param>
+        /// <param name="direction">World-space direction that damage was delt in. This may not be normalized.</param>
         /// <param name="data">Any data sent with the damage, if no data is sent this will be <c>null</c>.</param>
         /// <returns>
         /// Returns the total damage actually delt to the <see cref="actor"/>. If the <see cref="actor"/> has something
@@ -106,7 +109,7 @@ namespace BlackTundra.World.Actors {
         /// <remarks>
         /// If the <see cref="actor"/> cannot be damaged, return <c>0.0f</c> from this method.
         /// </remarks>
-        protected internal abstract float OnActorDamaged(in object sender, in float damage, in object data);
+        protected internal abstract float OnActorDamaged(in object sender, in float damage, in DamageType damageType, in Vector3 point, in Vector3 direction, in object data);
 
         #endregion
 
