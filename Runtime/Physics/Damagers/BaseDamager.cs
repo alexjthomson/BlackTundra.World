@@ -51,6 +51,18 @@ namespace BlackTundra.World.Damagers {
 
         #endregion
 
+        #region OnDamagerCollisionEnter
+
+        public abstract void OnDamagerCollisionEnter(in Collision collision);
+
+        #endregion
+
+        #region OnDamagerCollisionExit
+
+        public abstract void OnDamagerCollisionExit(in Collision collision);
+
+        #endregion
+
         #endregion
 
     }

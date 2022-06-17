@@ -59,9 +59,9 @@ namespace BlackTundra.World.Damagers {
 
         #region logic
 
-        #region OnCollisionEnter
+        #region OnDamagerCollisionEnter
 
-        private void OnCollisionEnter(Collision collision) {
+        public override void OnDamagerCollisionEnter(in Collision collision) {
             // validate collision:
             if (collision == null) return;
             // validate damage range:
@@ -95,6 +95,12 @@ namespace BlackTundra.World.Damagers {
                 OnImpact(damageable, DamageController.sender, impactDamage, impactPoint, impactVelocity);
             }
         }
+
+        #endregion
+
+        #region OnDamagerCollisionExit
+
+        public override void OnDamagerCollisionExit(in Collision collision) { }
 
         #endregion
 

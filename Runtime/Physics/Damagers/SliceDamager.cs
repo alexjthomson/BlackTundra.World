@@ -245,6 +245,34 @@ namespace BlackTundra.World.Damagers {
 #endif
         #endregion
 
+        #region OnDamagerCollisionEnter
+
+        public override void OnDamagerCollisionEnter(in Collision collision) {
+            if (collision == null) return;
+            // recalculate slice surface data:
+            RecalculateSliceSurfaceData();
+            // process contact points:
+            ContactPoint[] contactPoints = collision.contacts;
+            for (int i = contactPoints.Length - 1; i >= 0; i--) {
+                ProcessContactPointHit(contactPoints[i]);
+            }
+        }
+
+        #endregion
+
+        #region OnDamagerCollisionExit
+
+        public override void OnDamagerCollisionExit(in Collision collision) {
+            if (collision == null) return;
+            // process contact points:
+            ContactPoint[] contactPoints = collision.contacts;
+            for (int i = contactPoints.Length - 1; i >= 0; i--) {
+                RemoveContactPoint(contactPoints[i]);
+            }
+        }
+
+        #endregion
+
         #region RecalculateSliceSurfaceData
 
         /// <summary>
@@ -257,21 +285,6 @@ namespace BlackTundra.World.Damagers {
             _sliceSurfaceLength = _sliceSurfaceStartToEndDirection.magnitude;
             _sliceSurfaceStartToEndDirection *= 1.0f / _sliceSurfaceLength; // normalize slice surface start to end direction
             _sliceSurfaceDirection = transform.TransformDirection(sliceSurfaceDirection).normalized;
-        }
-
-        #endregion
-
-        #region OnCollisionEnter
-
-        private void OnCollisionEnter(Collision collision) {
-            if (collision == null) return;
-            // recalculate slice surface data:
-            RecalculateSliceSurfaceData();
-            // process contact points:
-            ContactPoint[] contactPoints = collision.contacts;
-            for (int i = contactPoints.Length - 1; i >= 0; i--) {
-                ProcessContactPointHit(contactPoints[i]);
-            }
         }
 
         #endregion
@@ -354,19 +367,6 @@ namespace BlackTundra.World.Damagers {
                 localSliceDirection
             );
             return true;
-        }
-
-        #endregion
-
-        #region OnCollisionExit
-
-        private void OnCollisionExit(Collision collision) {
-            if (collision == null) return;
-            // process contact points:
-            ContactPoint[] contactPoints = collision.contacts;
-            for (int i = contactPoints.Length - 1; i >= 0; i--) {
-                RemoveContactPoint(contactPoints[i]);
-            }
         }
 
         #endregion

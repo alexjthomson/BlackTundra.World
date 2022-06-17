@@ -84,7 +84,21 @@ namespace BlackTundra.World.Damagers {
             for (int i = damagers.Count - 1; i >= 0; i--) {
                 damager = damagers[i];
                 if (damager == null) continue;
-                damager.OnCollisionEnter(collision);
+                damager.OnDamagerCollisionEnter(collision);
+            }
+        }
+
+        #endregion
+
+        #region OnCollisionExit
+
+        private void OnCollisionExit(Collision collision) {
+            if (collision == null) return;
+            BaseDamager damager;
+            for (int i = damagers.Count - 1; i >= 0; i--) {
+                damager = damagers[i];
+                if (damager == null) continue;
+                damager.OnDamagerCollisionExit(collision);
             }
         }
 
