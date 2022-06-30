@@ -1,3 +1,5 @@
+using BlackTundra.Foundation.Utility;
+
 using UnityEngine;
 
 namespace BlackTundra.World.XR.Experimental.Tracking {
@@ -69,34 +71,18 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
         #region visual interpolation
 
         /// <summary>
-        /// Actual position of the <see cref="transform"/> before a visual update (to make the tracking look smoother).
+        /// Actual position of the <see cref="XRRigidbodyTracker"/>.
         /// </summary>
-        protected Vector3 actualPositionRestore = Vector3.zero;
+        private Vector3 actualPosition = Vector3.zero;
 
         /// <summary>
-        /// Actual rotation of the <see cref="transform"/> before a visual update (to make the tracking look smoother).
+        /// Actual rotation of the <see cref="XRRigidbodyTracker"/>.
         /// </summary>
-        protected Quaternion actualRotationRestore = Quaternion.identity;
+        private Quaternion actualRotation = Quaternion.identity;
 
-        /// <summary>
-        /// Visual position of the tracker.
-        /// </summary>
-        protected Vector3 visualPosition = Vector3.zero;
-
-        /// <summary>
-        /// Visual rotation of the tracker.
-        /// </summary>
-        protected Quaternion visualRotation = Quaternion.identity;
-
-        /// <summary>
-        /// Last visual position of the tracker.
-        /// </summary>
-        protected Vector3 lastVisualPositionSnapshot = Vector3.zero;
-
-        /// <summary>
-        /// Last visual rotation of the tracker.
-        /// </summary>
-        protected Quaternion lastVisualRotationSnapshot = Quaternion.identity;
+        private Vector3 lastPosition = Vector3.zero, nextPosition = Vector3.zero;
+        private Quaternion lastRotation = Quaternion.identity, nextRotation = Quaternion.identity;
+        private float lerpProgress = 0.0f;
 
         #endregion
 
@@ -168,6 +154,7 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
                 enabled = false;
                 return;
             }
+            rigidbody.interpolation = RigidbodyInterpolation.None; // enforce no interpolation
             // teleport to tracker:
             TeleportToTracker();
         }
@@ -184,8 +171,8 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
             rigidbody.rotation = _trackerRotation;
             rigidbody.velocity = Vector3.zero;
             rigidbody.angularVelocity = Vector3.zero;
-            actualPositionRestore = _trackerPosition;
-            actualRotationRestore = _trackerRotation;
+            actualPosition = _trackerPosition;
+            actualRotation = _trackerRotation;
             ResetVisuals();
         }
 
@@ -197,10 +184,23 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
         /// Resets any visual variables.
         /// </summary>
         protected virtual void ResetVisuals() {
-            visualPosition = actualPositionRestore;
-            visualRotation = ToLocalRotation(actualRotationRestore);
-            lastVisualPositionSnapshot = _trackerPosition;
-            lastVisualRotationSnapshot = ToLocalRotation(_trackerRotation);
+            Transform parent = transform.parent;
+            nextPosition = parent.ToLocalPoint(actualPosition);
+            nextRotation = parent.ToLocalRotation(actualRotation);
+            lastPosition = nextPosition;
+            lastRotation = nextRotation;
+        }
+
+        #endregion
+
+        #region UpdateVisualTargets
+
+        protected virtual void UpdateVisualTargets() {
+            Transform parent = transform.parent;
+            nextPosition = parent.ToLocalPoint(actualPosition);
+            nextRotation = parent.ToLocalRotation(actualRotation);
+            lastPosition = transform.localPosition;
+            lastRotation = transform.localRotation;
         }
 
         #endregion
@@ -208,47 +208,21 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
         #region LateUpdate
 
         protected virtual void LateUpdate() {
-            UpdateVisualPositionalOffset();
-            UpdateVisualRotationalOffset();
-            transform.position = visualPosition;
-            //transform.localRotation = visualRotation;
-        }
-
-        #endregion
-
-        #region UpdateVisualPositionalOffset
-
-        protected virtual void UpdateVisualPositionalOffset() {
-            // calculate delta position:
-            Vector3 deltaTrackerPosition = _trackerPosition - lastVisualPositionSnapshot;
-            lastVisualPositionSnapshot = _trackerPosition;
-            // apply delta position to visual offset:
-            visualPosition += deltaTrackerPosition;
-        }
-
-        #endregion
-
-        #region ToLocalRotation
-
-        protected Quaternion ToLocalRotation(in Quaternion rotation) {
-            Transform parentTransform = transform.parent;
-            if (parentTransform != null) {
-                return Quaternion.Inverse(parentTransform.rotation) * rotation;
+            // interpolate:
+            if (lerpProgress != 1.0f) {
+                // increase lerp value:
+                float deltaTime = Time.deltaTime;
+                lerpProgress += deltaTime;
+                if (lerpProgress > 1.0f) {
+                    lerpProgress = 1.0f;
+                }
+                // apply lerp:
+                Vector3 currentPosition = Vector3.LerpUnclamped(lastPosition, nextPosition, lerpProgress);
+                Quaternion currentRotation = Quaternion.LerpUnclamped(lastRotation, nextRotation, lerpProgress);
+                // calculate world-space positions:
+                Transform parent = transform.parent;
+                transform.SetPositionAndRotation(parent.ToWorldPoint(currentPosition), parent.ToWorldRotation(currentRotation));
             }
-            return rotation;
-        }
-
-        #endregion
-
-        #region UpdateVisualRotationalOffset
-
-        protected virtual void UpdateVisualRotationalOffset() {
-            // calculate delta rotation:
-            Quaternion localTrackerRotation = ToLocalRotation(_trackerRotation);
-            Quaternion deltaTrackerRotation = localTrackerRotation * Quaternion.Inverse(lastVisualRotationSnapshot);
-            lastVisualRotationSnapshot = localTrackerRotation;
-            // apply delta rotation to visual offset:
-            visualRotation *= deltaTrackerRotation;
         }
 
         #endregion
@@ -258,8 +232,8 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
         protected virtual void OnPostRender() {
             // reset the transform position to the actual position and rotation after each frame:
             transform.SetPositionAndRotation(
-                actualPositionRestore,
-                actualRotationRestore
+                actualPosition,
+                actualRotation
             );
         }
 
@@ -272,7 +246,7 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
             float deltaTime = Time.fixedDeltaTime;
             float inverseDeltaTime = 1.0f / deltaTime;
             // calculate positional data:
-            Vector3 actualPosition = rigidbody.position;
+            actualPosition = rigidbody.position;
             Vector3 deltaPosition = _trackerPosition - actualPosition;
             // distance check:
             float deltaPositionSqrLength = deltaPosition.sqrMagnitude;
@@ -298,10 +272,10 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
                 // TODO: add reaction forces here (forces applied to the parent IPhysicsObject when pushing against an object)
             }
             // record positional and rotation restore points:
-            actualPositionRestore = rigidbody.position;
-            actualRotationRestore = rigidbody.rotation;
-            // reset visuals:
-            ResetVisuals();
+            actualPosition = rigidbody.position;
+            actualRotation = rigidbody.rotation;
+            // update visuals:
+            UpdateVisualTargets();
         }
 
         #endregion
