@@ -83,6 +83,7 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
         private Vector3 lastPosition = Vector3.zero, nextPosition = Vector3.zero;
         private Quaternion lastRotation = Quaternion.identity, nextRotation = Quaternion.identity;
         private float lerpProgress = 0.0f;
+        private float lerpCoefficient = 0.0f;
 
         #endregion
 
@@ -189,6 +190,8 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
             nextRotation = parent.ToLocalRotation(actualRotation);
             lastPosition = nextPosition;
             lastRotation = nextRotation;
+            lerpProgress = 0.0f;
+            lerpCoefficient = 0.0f;
         }
 
         #endregion
@@ -197,10 +200,12 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
 
         protected virtual void UpdateVisualTargets() {
             Transform parent = transform.parent;
+            lastPosition = nextPosition;
+            lastRotation = nextRotation;
             nextPosition = parent.ToLocalPoint(actualPosition);
             nextRotation = parent.ToLocalRotation(actualRotation);
-            lastPosition = transform.localPosition;
-            lastRotation = transform.localRotation;
+            lerpProgress = 0.0f;
+            lerpCoefficient = 1.0f / Time.fixedDeltaTime;
         }
 
         #endregion
@@ -212,7 +217,7 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
             if (lerpProgress != 1.0f) {
                 // increase lerp value:
                 float deltaTime = Time.deltaTime;
-                lerpProgress += deltaTime;
+                lerpProgress += deltaTime * lerpCoefficient;
                 if (lerpProgress > 1.0f) {
                     lerpProgress = 1.0f;
                 }
