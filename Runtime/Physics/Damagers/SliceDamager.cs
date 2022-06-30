@@ -61,7 +61,7 @@ namespace BlackTundra.World.Damagers {
 
             internal ColliderSliceData(in Collider collider, in MaterialDescriptor materialDescriptor, in float sliceDepth, in Vector3 localSlicePoint, in Vector3 localSliceDirection) {
                 if (collider == null) throw new ArgumentNullException(nameof(collider));
-                if (materialDescriptor == null) throw new ArgumentNullException(nameof(materialDescriptor));
+                //if (materialDescriptor == null) throw new ArgumentNullException(nameof(materialDescriptor));
                 if (sliceDepth < 0.0f) throw new ArgumentOutOfRangeException(nameof(sliceDepth));
                 this.collider = collider;
                 this.materialDescriptor = materialDescriptor;
@@ -229,16 +229,25 @@ namespace BlackTundra.World.Damagers {
             Gizmos.color = Color.cyan;
             Vector3 start = transform.TransformPoint(sliceSurfaceStart);
             Vector3 end = transform.TransformPoint(sliceSurfaceEnd);
+            Vector3 mid = (start + end) * 0.5f;
             Gizmos.DrawWireSphere(start, 0.025f);
             Gizmos.DrawWireSphere(end, 0.025f);
             Gizmos.DrawLine(start, end);
             // draw surface direction:
             Gizmos.color = Color.green;
-            Vector3 sliceSurfaceVector = transform.TransformDirection(sliceSurfaceDirection).normalized * 0.25f;
-            Gizmos.DrawLine(start, start + sliceSurfaceVector);
+            Vector3 sliceSurfaceWorldDirection = transform.TransformDirection(sliceSurfaceDirection).normalized;
+            Vector3 sliceSurfaceVector = sliceSurfaceWorldDirection * 0.25f;
+            Gizmos.DrawLine(mid, mid + sliceSurfaceVector);
             if (doubleSided) {
                 Gizmos.color = Color.yellow;
-                Gizmos.DrawLine(start, start - sliceSurfaceVector);
+                Gizmos.DrawLine(mid, mid - sliceSurfaceVector);
+            }
+            // draw penetration depth:
+            Gizmos.color = Color.red;
+            Vector3 penetrationDepthVector = penetrationDepth * sliceSurfaceWorldDirection;
+            Gizmos.DrawLine(start + penetrationDepthVector, end + penetrationDepthVector);
+            if (doubleSided) {
+                Gizmos.DrawLine(start - penetrationDepthVector, end - penetrationDepthVector);
             }
         }
 
