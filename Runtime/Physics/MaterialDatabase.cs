@@ -83,7 +83,13 @@ namespace BlackTundra.World {
         public static MaterialDescriptor GetMaterialDescriptor(in PhysicMaterial physicMaterial)
             => physicMaterial != null && MaterialDictionary.TryGetValue(physicMaterial, out MaterialDescriptor descriptor)
                 ? descriptor
-                : _fallbackMaterialDescriptor;
+                : GetFallbackMaterialDescriptor();
+
+        #endregion
+
+        #region GetFallbackMaterialDescriptor
+
+        public static MaterialDescriptor GetFallbackMaterialDescriptor() => _fallbackMaterialDescriptor;
 
         #endregion
 

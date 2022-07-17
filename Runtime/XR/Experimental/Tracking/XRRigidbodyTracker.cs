@@ -155,7 +155,6 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
                 enabled = false;
                 return;
             }
-            rigidbody.interpolation = RigidbodyInterpolation.None; // enforce no interpolation
             // teleport to tracker:
             TeleportToTracker();
         }
@@ -214,6 +213,7 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
 
         protected virtual void LateUpdate() {
             // interpolate:
+            if (1 == 1) return;
             if (lerpProgress != 1.0f) {
                 // increase lerp value:
                 float deltaTime = Time.deltaTime;
@@ -267,6 +267,8 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
                 Quaternion actualRotation = rigidbody.rotation;
                 Quaternion deltaRotation = _trackerRotation * Quaternion.Inverse(actualRotation);
                 deltaRotation.ToAngleAxis(out float angleDegrees, out Vector3 axis);
+
+                //Mathf.SmoothDampAngle();
                 if (angleDegrees > 180.0f) angleDegrees -= 360.0f;
                 if (Mathf.Abs(angleDegrees) > Mathf.Epsilon) {
                     Vector3 angularVelocity = axis * (angleDegrees * Mathf.Deg2Rad * inverseDeltaTime);
@@ -274,6 +276,7 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
                         rigidbody.angularVelocity = angularVelocity * angularVelocityScale;
                     }
                 }
+                //rigidbody.MoveRotation(_trackerRotation);
                 // TODO: add reaction forces here (forces applied to the parent IPhysicsObject when pushing against an object)
             }
             // record positional and rotation restore points:

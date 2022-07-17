@@ -9,7 +9,7 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
     /// Drives an <see cref="IXRTracker"/> based off of tracker inputs.
     /// </summary>
     [Serializable]
-    public sealed class TrackerDriver {
+    public sealed class XRTrackerDriver {
 
         #region variable
 

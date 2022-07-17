@@ -6,9 +6,7 @@ namespace BlackTundra.World.Editor {
 
     static class VolumeMenuItems {
 
-        private const string RootMenuItem = "GameObject/Physics/Volume/";
-
-        [MenuItem(RootMenuItem + "Global Volume")]
+        [MenuItem("GameObject/Black Tundra/World/Volume/Global Volume")]
         private static void CreateGlobalVolume(MenuCommand command) {
             GameObject gameObject = new GameObject("GlobalVolume", typeof(Volume));
             GameObjectUtility.SetParentAndAlign(gameObject, command.context as GameObject);
@@ -17,7 +15,7 @@ namespace BlackTundra.World.Editor {
             Selection.activeObject = gameObject;
         }
 
-        [MenuItem(RootMenuItem + "Box Volume")]
+        [MenuItem("GameObject/Black Tundra/World/Volume/Box Volume")]
         private static void CreateBoxVolume(MenuCommand command) {
             GameObject gameObject = new GameObject("GlobalVolume", typeof(Volume), typeof(BoxCollider));
             GameObjectUtility.SetParentAndAlign(gameObject, command.context as GameObject);
@@ -28,7 +26,7 @@ namespace BlackTundra.World.Editor {
             Selection.activeObject = gameObject;
         }
 
-        [MenuItem(RootMenuItem + "Sphere Volume")]
+        [MenuItem("GameObject/Black Tundra/World/Volume/Sphere Volume")]
         private static void CreateSphereVolume(MenuCommand command) {
             GameObject gameObject = new GameObject("GlobalVolume", typeof(Volume), typeof(SphereCollider));
             GameObjectUtility.SetParentAndAlign(gameObject, command.context as GameObject);

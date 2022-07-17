@@ -6,9 +6,9 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
     /// Manages a set of <see cref="IXRTracker"/> components.
     /// </summary>
 #if UNITY_EDITOR
-    [AddComponentMenu(menuName: "XR/Tracking/Tracking Controller", order: 0)]
+    [AddComponentMenu(menuName: "XR/Tracking/XR Tracking Controller", order: 0)]
 #endif
-    public sealed class TrackingController : MonoBehaviour {
+    public sealed class XRTrackingController : MonoBehaviour {
 
         #region variable
 
@@ -18,7 +18,7 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
 #else
         private
 #endif
-        TrackerDriver[] trackerDrivers = new TrackerDriver[0];
+        XRTrackerDriver[] trackerDrivers = new XRTrackerDriver[0];
 
         #endregion
 
@@ -27,7 +27,7 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
         #region Awake
 
         private void Awake() {
-            TrackerDriver trackerDriver;
+            XRTrackerDriver trackerDriver;
             for (int i = trackerDrivers.Length - 1; i >= 0; i--) {
                 trackerDriver = trackerDrivers[i];
                 trackerDriver.Initialise();
@@ -39,7 +39,7 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
         #region Update
 
         private void Update() {
-            TrackerDriver trackerDriver;
+            XRTrackerDriver trackerDriver;
             for (int i = trackerDrivers.Length - 1; i >= 0; i--) {
                 trackerDriver = trackerDrivers[i];
                 trackerDriver.UpdateTracker();

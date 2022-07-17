@@ -14,7 +14,7 @@ namespace BlackTundra.World {
     [DisallowMultipleComponent]
     //[RequireComponent(typeof(Collider))]
 #if UNITY_EDITOR
-    [AddComponentMenu("Physics/Volume")]
+    [AddComponentMenu("World/Volume")]
 #endif
     public sealed class Volume : MonoBehaviour {
 
