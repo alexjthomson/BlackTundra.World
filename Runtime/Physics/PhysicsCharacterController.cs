@@ -55,6 +55,9 @@ namespace BlackTundra.World {
         /// <summary>
         /// Mass of the <see cref="PhysicsCharacterController"/>.
         /// </summary>
+#if UNITY_EDITOR
+        [HideInInspector]
+#endif
         [SerializeField]
         private float _mass = 80.0f;
 
@@ -66,47 +69,50 @@ namespace BlackTundra.World {
         /// <summary>
         /// Centre of mass of the <see cref="PhysicsCharacterController"/>.
         /// </summary>
+#if UNITY_EDITOR
+        [HideInInspector]
+#endif
         [SerializeField]
         private Vector3 _centreOfMass = Vector3.zero;
 
         /// <summary>
         /// When <c>true</c>, the <see cref="PhysicsCharacterController"/> will use gravity.
         /// </summary>
+#if UNITY_EDITOR
+        [HideInInspector]
+#endif
         [SerializeField]
         private bool _useGravity = true;
+
+        /// <summary>
+        /// <see cref="LayerMask"/> containing the layers that are considered to be solid.
+        /// </summary>
+#if UNITY_EDITOR
+        [HideInInspector]
+#endif
+        [SerializeField]
+        private LayerMask _solidMask = 0;
+
+        /// <summary>
+        /// Actual radius of the <see cref="_characterController"/>. This is calculated by adding together the <see cref="_radius"/> and <see cref="_skinWidth"/>.
+        /// </summary>
+#if UNITY_EDITOR
+        [HideInInspector]
+#endif
+        [SerializeField]
+        private float _actualRadius = 0.15f;
 
         /// <summary>
         /// Radius of the <see cref="_characterController"/>.
         /// </summary>
         /// <seealso cref="_characterController"/>
-        [SerializeField]
         private float _radius = 0.1f;
 
         /// <summary>
         /// Skin width/radius of the <see cref="_characterController"/>.
         /// </summary>
         /// <seealso cref="_characterController"/>
-        [SerializeField]
         private float _skinWidth = 0.05f;
-
-        /// <summary>
-        /// <see cref="LayerMask"/> containing the layers that are considered to be part of the ground.
-        /// </summary>
-        public LayerMask _groundMask = 0;
-
-        /// <summary>
-        /// Actual radius of the <see cref="_characterController"/>. This is calculated by adding together the <see cref="_radius"/> and <see cref="_skinWidth"/>.
-        /// </summary>
-        private float _actualRadius = 0.15f;
-
-        /// <summary>
-        /// Height of the <see cref="_characterController"/> including <c>(2 * <see cref="_actualRadius"/>)</c>.
-        /// </summary>
-        /// <seealso cref="_actualHeight"/>
-        /// <seealso cref="_actualRadius"/>
-        /// <seealso cref="_characterController"/>
-        [SerializeField]
-        private float _height = 1.8f;
 
         /// <summary>
         /// Actual height of the <see cref="_characterController"/>. This is measured between the base of the <see cref="_characterController"/> and the top
@@ -114,7 +120,19 @@ namespace BlackTundra.World {
         /// </summary>
         /// <seealso cref="_height"/>
         /// <seealso cref="_characterController"/>
+#if UNITY_EDITOR
+        [HideInInspector]
+#endif
+        [SerializeField]
         private float _actualHeight = 1.8f;
+
+        /// <summary>
+        /// Height of the <see cref="_characterController"/> including <c>(2 * <see cref="_actualRadius"/>)</c>.
+        /// </summary>
+        /// <seealso cref="_actualHeight"/>
+        /// <seealso cref="_actualRadius"/>
+        /// <seealso cref="_characterController"/>
+        private float _height = 1.8f;
 
         /// <summary>
         /// Centre of the <see cref="_characterController"/>. This is calculated by halfing the y component of the <see cref="_actualHeight"/>.
@@ -135,6 +153,9 @@ namespace BlackTundra.World {
         /// <summary>
         /// Drag coefficient to use for the <see cref="PhysicsCharacterController"/>.
         /// </summary>
+#if UNITY_EDITOR
+        [HideInInspector]
+#endif
         [SerializeField]
         private float _dragCoefficient = 1.2f;
 
@@ -148,8 +169,8 @@ namespace BlackTundra.World {
         /// <summary>
         /// An amount of velocity waiting (pending) to be applied but not directly to the <see cref="_velocity"/>. This velocity is applied seperately and is used
         /// to artificially apply velocity such as velocity forcing the <see cref="PhysicsCharacterController"/> into the floor when grounded so that there is an
-        /// instant sticking force to the floor. This velocity is entirely internally controlled on a <see cref="FixedUpdate"/> basis. This velocity only exists
-        /// within the <see cref="FixedUpdate"/> iteration it is created; it is cleared at the end of each <see cref="FixedUpdate"/>.
+        /// instant sticking force to the floor. This velocity is entirely internally controlled on a <see cref="FixedUpdate"/> basis. This velocity is not
+        /// cleared at the end of each <see cref="FixedUpdate"/> and is persistant.
         /// </summary>
         private Vector3 _pendingInstantVelocity = Vector3.zero;
 
@@ -293,6 +314,14 @@ namespace BlackTundra.World {
         }
 
         /// <summary>
+        /// <see cref="LayerMask"/> containing layers that contain solid objects.
+        /// </summary>
+        public LayerMask solidLayerMask {
+            get => _solidMask;
+            set => _solidMask = value;
+        }
+
+        /// <summary>
         /// <c>true</c> if the <see cref="PhysicsCharacterController"/> is touching the ground.
         /// </summary>
         /// <seealso cref="groundMaterialDescriptor"/>
@@ -320,17 +349,15 @@ namespace BlackTundra.World {
         #region OnEnable
 
         protected virtual void OnEnable() {
-            // get character controller:
+            // setup character controller:
             _characterController = gameObject.ForceGetComponent<CharacterController>();
 #if UNITY_EDITOR
             _characterController.hideFlags = HideFlags.HideInInspector;
 #endif
+            ResetController();
             // align to transform:
             SetPosition(transform.position);
             SetRotation(transform.rotation);
-            SetVelocity(Vector3.zero);
-            _isGrounded = false;
-            ClearGroundPhysicMaterial();
         }
 
         #endregion
@@ -383,8 +410,6 @@ namespace BlackTundra.World {
                 }
                 // check if the controller impacted the ground or left the ground:
                 if (_isGrounded) { // the controller impacted the ground
-                    // find the material that the controller is in contact with:
-                    FindGroundPhysicMaterial();
                     // apply instant stick force:
                     if (_useGravity) { // the controller is using gravity
                         _pendingInstantVelocity = GroundStickVelocity; // try to stick to the ground
@@ -403,6 +428,11 @@ namespace BlackTundra.World {
                         OnLeaveGround.Invoke();
                     }
                 }
+            }
+            // check if grounded:
+            if (_isGrounded) {
+                // find the ground physic material for the current position that the controller is in:
+                FindGroundPhysicMaterial();
             }
         }
 
@@ -819,15 +849,14 @@ namespace BlackTundra.World {
         /// Finds the <see cref="PhysicMaterial"/> for the surface that the <see cref="PhysicsCharacterController"/> is in contact with and
         /// assigns it to the <see cref="_groundPhysicMaterial"/>.
         /// </summary>
-        protected virtual void FindGroundPhysicMaterial() {
+        protected void FindGroundPhysicMaterial() {
             // calculate the cast distance:
             float castDistance = _actualRadius + _skinWidth + 0.0001f; // the sphere-cast needs to travel the radius of the controller plus the skin radius since a collider could have penetrated slightly into the skin of the controller
             // calculate the sphere-cast start position (in world-space):
-            Vector3 castStart = transform.position;
+            Vector3 castStart = GetPosition();
             castStart.y += castDistance;
             // begin the sphere-cast:
-            if (Physics.SphereCast(castStart, castDistance + 0.0001f, Vector3.down, out RaycastHit hit, _actualRadius + 0.01f, _groundMask, QueryTriggerInteraction.Ignore)) {
-                Collider hitCollider = hit.collider;
+            if (Physics.SphereCast(castStart, castDistance + 0.0001f, Vector3.down, out RaycastHit hit, _actualRadius + 0.01f, _solidMask, QueryTriggerInteraction.Ignore)) {
                 _groundPhysicMaterial = hit.collider.material;
             } else { // nothing was hit
                 _groundPhysicMaterial = null;
@@ -841,8 +870,28 @@ namespace BlackTundra.World {
         /// <summary>
         /// Clears the <see cref="_groundPhysicMaterial"/>.
         /// </summary>
-        protected virtual void ClearGroundPhysicMaterial() {
+        protected void ClearGroundPhysicMaterial() {
             _groundPhysicMaterial = null;
+        }
+
+        #endregion
+
+        #region ResetController
+
+        private void ResetController() {
+            height = _actualHeight;
+            radius = _actualRadius;
+            ResetControllerState();
+        }
+
+        #endregion
+
+        #region ResetControllerState
+
+        private void ResetControllerState() {
+            SetVelocity(Vector3.zero);
+            _isGrounded = false;
+            ClearGroundPhysicMaterial();
         }
 
         #endregion
