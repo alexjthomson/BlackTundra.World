@@ -769,11 +769,12 @@ namespace BlackTundra.World {
         /// World-space centre of mass.
         /// </returns>
         /// <seealso cref="GetCentreOfMass"/>
-        public virtual Vector3 GetCentreOfMassWorldSpace() {
+        public Vector3 GetCentreOfMassWorldSpace() {
+            Vector3 centreOfMass = GetCentreOfMass();
             return transform.TransformPoint(
-                _centreOfMass.x + _centre.x,
-                _centreOfMass.y,
-                _centreOfMass.z + _centre.z
+                centreOfMass.x + _centre.x,
+                centreOfMass.y,
+                centreOfMass.z + _centre.z
             );
         }
 
