@@ -50,7 +50,21 @@ namespace BlackTundra.World {
         /// <summary>
         /// <see cref="CharacterController"/> component attached to the same <see cref="GameObject"/> as the <see cref="PhysicsCharacterController"/>.
         /// </summary>
-        private CharacterController _characterController = null;
+#if UNITY_EDITOR
+        internal
+#else
+        private
+#endif
+        CharacterController _characterController = null;
+
+        /// <summary>
+        /// <see cref="PhysicsCharacterControllerFlags"/> that toggle features of the <see cref="PhysicsCharacterController"/> simulation.
+        /// </summary>
+#if UNITY_EDITOR
+        [HideInInspector]
+#endif
+        [SerializeField]
+        private PhysicsCharacterControllerFlags _flags = 0;
 
         /// <summary>
         /// Mass of the <see cref="PhysicsCharacterController"/>.
@@ -74,15 +88,6 @@ namespace BlackTundra.World {
 #endif
         [SerializeField]
         private Vector3 _centreOfMass = Vector3.zero;
-
-        /// <summary>
-        /// When <c>true</c>, the <see cref="PhysicsCharacterController"/> will use gravity.
-        /// </summary>
-#if UNITY_EDITOR
-        [HideInInspector]
-#endif
-        [SerializeField]
-        private bool _useGravity = true;
 
         /// <summary>
         /// <see cref="LayerMask"/> containing the layers that are considered to be solid.
@@ -199,7 +204,7 @@ namespace BlackTundra.World {
         /// <remarks>
         /// This is invoked after <see cref="OnGroundedChanged"/>.
         /// </remarks>
-        public UnityAction<Vector3> OnImpactGround = null;
+        public UnityEvent<Vector3> OnImpactGround = null;
 
         /// <summary>
         /// Invoked when the <see cref="PhysicsCharacterController"/> leaves the ground.
@@ -207,7 +212,7 @@ namespace BlackTundra.World {
         /// <remarks>
         /// This is invoked after <see cref="OnGroundedChanged"/>.
         /// </remarks>
-        public UnityAction OnLeaveGround = null;
+        public UnityEvent OnLeaveGround = null;
 
         /// <summary>
         /// Invoked when the <see cref="PhysicsCharacterController"/> <see cref="isGrounded"/> state changes.
@@ -215,7 +220,7 @@ namespace BlackTundra.World {
         /// <remarks>
         /// This is invoked before <see cref="OnImpactGround"/> and <see cref="OnLeaveGround"/>.
         /// </remarks>
-        public UnityAction<bool> OnGroundedChanged = null;
+        public UnityEvent<bool> OnGroundedChanged = null;
 
         #endregion
 
@@ -288,6 +293,14 @@ namespace BlackTundra.World {
         }
 
         /// <summary>
+        /// <see cref="PhysicsCharacterControllerFlags"/> that toggle features of the <see cref="PhysicsCharacterController"/> simulation.
+        /// </summary>
+        public PhysicsCharacterControllerFlags flags {
+            get => _flags;
+            set => _flags = value;
+        }
+
+        /// <summary>
         /// Mass of the <see cref="PhysicsCharacterController"/> in kg.
         /// </summary>
         /// <seealso cref="GetMass"/>
@@ -314,6 +327,17 @@ namespace BlackTundra.World {
         }
 
         /// <summary>
+        /// Drag coefficient to use for the <see cref="PhysicsCharacterController"/>.
+        /// </summary>
+        public float dragCoefficient {
+            get => _dragCoefficient;
+            set {
+                if (value < 0.0f || !float.IsNormal(value)) throw new ArgumentException("Drag coefficient must be greater than zero.");
+                _dragCoefficient = value;
+            }
+        }
+
+        /// <summary>
         /// <see cref="LayerMask"/> containing layers that contain solid objects.
         /// </summary>
         public LayerMask solidLayerMask {
@@ -334,20 +358,15 @@ namespace BlackTundra.World {
         /// <seealso cref="isGrounded"/>
         public PhysicMaterial groundMaterialDescriptor => _groundPhysicMaterial;
 
-        /// <summary>
-        /// When <c>true</c>, the <see cref="PhysicsCharacterController"/> will use gravity.
-        /// </summary>
-        public bool useGravity {
-            get => _useGravity;
-            set => _useGravity = value;
-        }
-
         #endregion
 
         #region logic
 
         #region OnEnable
 
+#if UNITY_EDITOR
+        internal
+#endif
         protected virtual void OnEnable() {
             // setup character controller:
             _characterController = gameObject.ForceGetComponent<CharacterController>();
@@ -381,13 +400,12 @@ namespace BlackTundra.World {
             float deltaTime = Time.fixedDeltaTime;
             if (deltaTime < Mathf.Epsilon) return; // no time has passed, do not perform an update
             float inverseDeltaTime = 1.0f / deltaTime;
-            // perform state updates:
+            // update simulation:
             UpdateGroundedState();
-            // apply physics updates:
             ApplyTimeBasedVelocity(deltaTime);
+            ApplyGravityForce(deltaTime);
             ApplyEnvironmentalForces(deltaTime);
             ApplyGroundForces(deltaTime);
-            // update character controller:
             UpdateCharacterController(deltaTime, inverseDeltaTime);
         }
 
@@ -411,8 +429,10 @@ namespace BlackTundra.World {
                 // check if the controller impacted the ground or left the ground:
                 if (_isGrounded) { // the controller impacted the ground
                     // apply instant stick force:
-                    if (_useGravity) { // the controller is using gravity
+                    if ((_flags & (PhysicsCharacterControllerFlags.SimulateGravity | PhysicsCharacterControllerFlags.UseStickForce)) != 0) { // the controller is using gravity and stick force
                         _pendingInstantVelocity = GroundStickVelocity; // try to stick to the ground
+                    } else { // no stick force should be applied
+                        _pendingInstantVelocity = Vector3.zero;
                     }
                     // invoke impact ground callback:
                     if (OnImpactGround != null) {
@@ -450,6 +470,63 @@ namespace BlackTundra.World {
 
         #endregion
 
+        #region ApplyGravityForce
+
+        /// <summary>
+        /// Applies the gravitational force to the <see cref="PhysicsCharacterController"/>.
+        /// </summary>
+        protected virtual void ApplyGravityForce(in float deltaTime) {
+            if (!_isGrounded || (_flags & PhysicsCharacterControllerFlags.SimulateGravity) == 0) return;
+            _velocity.y -= Environment.gravity * deltaTime;
+        }
+
+        #endregion
+
+        #region ApplyEnvironmentalForces
+
+        /// <summary>
+        /// Applies environmental drag forces to the <see cref="PhysicsCharacterController"/>.
+        /// </summary>
+        protected virtual void ApplyEnvironmentalForces(in float deltaTime) {
+            if ((_flags & PhysicsCharacterControllerFlags.SimulateDrag | PhysicsCharacterControllerFlags.SimulateWind) == 0) return;
+            // calculate relative velocity (controller velocity combined with wind velocity/force):
+            Vector3 relativeVelocity;
+            if ((_flags & PhysicsCharacterControllerFlags.SimulateWind) != 0) {
+                relativeVelocity = -Environment.WindForce * _inverseMass;
+                if ((_flags & PhysicsCharacterControllerFlags.SimulateDrag) != 0) {
+                    relativeVelocity += _velocity;
+                }
+            } else {
+                relativeVelocity = _velocity;
+            }
+            // get the position of the controller:
+            Vector3 position = GetPosition();
+            // find rho at the base of the controller:
+            float rhoLower = Environment.RhoAt(position);
+            // find rho at the top of the controller:
+            float rhoUpper = Environment.RhoAt(new Vector3(position.x, position.y + _actualHeight, position.z));
+            // average the two values for rho to a final value:
+            float rho = (rhoUpper + rhoLower) * 0.5f;
+            // calculate the vertical (top-down) (y) area of the controller:
+            float verticalArea = _actualRadius * _actualRadius * Mathf.PI;
+            // calculate the horizontal (front) (xz) area of the controller (same from any angle about the y-axis for a capsule):
+            float horizontalArea = verticalArea + (_actualRadius * Mathf.Max(_actualHeight - _actualRadius - _actualRadius, 0.0f));
+            // combine drag coefficient with rho and delta time:
+            float combinedDragCoefficient = _dragCoefficient * -0.5f * rho * deltaTime;
+            // calculate the vertical (y) drag coefficient:
+            float verticalDragCoefficient = combinedDragCoefficient * verticalArea;
+            // calculate the horizontal (xz) drag coefficient:
+            float horizontalDragCoefficient = combinedDragCoefficient * horizontalArea;
+            // apply drag:
+            _velocity += new Vector3(
+                Mathf.Sign(relativeVelocity.x) * relativeVelocity.x * relativeVelocity.x * horizontalDragCoefficient,
+                Mathf.Sign(relativeVelocity.y) * relativeVelocity.y * relativeVelocity.y * verticalDragCoefficient,
+                Mathf.Sign(relativeVelocity.z) * relativeVelocity.z * relativeVelocity.z * horizontalDragCoefficient
+            );
+        }
+
+        #endregion
+
         #region ApplyGroundForces
 
         /// <summary>
@@ -471,35 +548,6 @@ namespace BlackTundra.World {
                     _velocity.y = 0.0f; // clear the y component, negative y velocity is not allowed / required while grounded
                 }
             }
-        }
-
-        #endregion
-
-        #region ApplyEnvironmentalForces
-
-        /// <summary>
-        /// Applies environmental forces to the <see cref="PhysicsCharacterController"/>.
-        /// </summary>
-        protected virtual void ApplyEnvironmentalForces(in float deltaTime) {
-            // TODO: apply wind forces here
-            // find rho at the base of the controller:
-            float rho = Environment.RhoAt(transform.position);
-            // calculate the vertical (top-down) (y) area of the controller:
-            float verticalArea = _actualRadius * _actualRadius * Mathf.PI;
-            // calculate the horizontal (front) (xz) area of the controller (same from any angle about the y-axis for a capsule):
-            float horizontalArea = verticalArea + (_actualRadius * Mathf.Max(_actualHeight - _actualRadius - _actualRadius, 0.0f));
-            // combine drag coefficient with rho and delta time:
-            float combinedDragCoefficient = _dragCoefficient * -0.5f * rho * deltaTime;
-            // calculate the vertical (y) drag coefficient:
-            float verticalDragCoefficient = combinedDragCoefficient * verticalArea;
-            // calculate the horizontal (xz) drag coefficient:
-            float horizontalDragCoefficient = combinedDragCoefficient * horizontalArea;
-            // apply drag:
-            _velocity += new Vector3(
-                Mathf.Sign(_velocity.x) * _velocity.x * _velocity.x * horizontalDragCoefficient,
-                Mathf.Sign(_velocity.y) * _velocity.y * _velocity.y * verticalDragCoefficient,
-                Mathf.Sign(_velocity.z) * _velocity.z * _velocity.z * horizontalDragCoefficient
-            );
         }
 
         #endregion
