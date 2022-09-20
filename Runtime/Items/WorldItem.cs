@@ -1,9 +1,9 @@
 using BlackTundra.Foundation.Utility;
 #if USE_XR_TOOLKIT
 using BlackTundra.World.XR;
+#endif
 
 using System;
-#endif
 
 using UnityEngine;
 using UnityEngine.Events;
