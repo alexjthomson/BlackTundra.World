@@ -1,3 +1,5 @@
+#if USE_XR_TOOLKIT
+
 using System.Collections.Generic;
 
 using UnityEngine.XR.Interaction.Toolkit;
@@ -27,3 +29,5 @@ namespace BlackTundra.World.XR {
     }
 
 }
+
+#endif

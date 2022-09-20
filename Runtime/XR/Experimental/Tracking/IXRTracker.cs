@@ -1,3 +1,5 @@
+#if USE_XR_TOOLKIT
+
 using UnityEngine;
 
 namespace BlackTundra.World.XR.Experimental.Tracking {
@@ -24,3 +26,5 @@ namespace BlackTundra.World.XR.Experimental.Tracking {
     }
 
 }
+
+#endif

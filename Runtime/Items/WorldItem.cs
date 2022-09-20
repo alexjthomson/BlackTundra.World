@@ -596,6 +596,7 @@ namespace BlackTundra.World.Items {
             colliderStates = null;
         }
 
+#if USE_XR_TOOLKIT
         public void EnableCollision(SelectExitEventArgs selectEnterEventArgs) {
             if (selectEnterEventArgs == null) throw new ArgumentNullException(nameof(selectEnterEventArgs));
             IXRSelectInteractable selectInteractable = selectEnterEventArgs.interactableObject;
@@ -606,6 +607,7 @@ namespace BlackTundra.World.Items {
                 SetIgnoreCollision(targetColliders, true);
             }
         }
+#endif
 
         #endregion
 
@@ -631,6 +633,7 @@ namespace BlackTundra.World.Items {
             }
         }
 
+#if USE_XR_TOOLKIT
         public void DisableCollision(SelectEnterEventArgs selectEnterEventArgs) {
             if (selectEnterEventArgs == null) throw new ArgumentNullException(nameof(selectEnterEventArgs));
             IXRSelectInteractable selectInteractable = selectEnterEventArgs.interactableObject;
@@ -641,6 +644,7 @@ namespace BlackTundra.World.Items {
                 SetIgnoreCollision(targetColliders, false);
             }
         }
+#endif
 
         #endregion
 
