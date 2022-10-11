@@ -6,10 +6,14 @@
 	"unity": "2020.1",
 	"type": "library",
 	"hideInEditor": false,
-	"author": {
+		"author": {
 		"name": "Alex Thomson",
 		"email": "alexjthomson1882@gmail.com",
-		"url": "https://github.com/alexjthomson1882"
+		"url": "alexthomson.dev"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/alexjthomson1882/BlackTundra.Foundation.git
 	},
 	"keywords": [
 		"world",
